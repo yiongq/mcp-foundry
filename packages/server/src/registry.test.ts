@@ -12,7 +12,13 @@ const orangehrm: SystemAdapter = {
   execute: async () => ({ data: null }),
 };
 
-const rbac = loadRbacConfig(`
+const espocrm: SystemAdapter = {
+  system: 'espocrm',
+  tools: () => ['list_accounts', 'get_opportunity'].map(spec),
+  execute: async () => ({ data: null }),
+};
+
+const hrRbac = loadRbacConfig(`
 roles:
   employee:
     tools: [list_employees, get_employee, get_leave_balance]
@@ -23,40 +29,63 @@ roles:
     tools: "*"
 `);
 
-const guard = new Guard(rbac, new MemoryAuditLogger());
+const crmRbac = loadRbacConfig(`
+roles:
+  sales_manager:
+    tools: "*"
+`);
+
+const audit = new MemoryAuditLogger();
+const systems = [
+  { adapter: orangehrm, guard: new Guard(hrRbac, audit) },
+  { adapter: espocrm, guard: new Guard(crmRbac, audit) },
+];
 
 describe('allowedToolEntries', () => {
   it('employee 只注册白名单内 3 个工具，get_salary 连列表都不出现', () => {
-    const names = allowedToolEntries([orangehrm], guard, { userId: 'e002', role: 'employee' }).map(
+    const names = allowedToolEntries(systems, { userId: 'e002', role: 'employee' }).map(
       (e) => e.spec.name,
     );
     expect(names).toEqual(['list_employees', 'get_employee', 'get_leave_balance']);
   });
 
-  it('hr_admin（tools: "*"）注册全部 4 个工具', () => {
-    const names = allowedToolEntries([orangehrm], guard, { userId: 'e004', role: 'hr_admin' }).map(
+  it('hr_admin（tools: "*"）注册 HR 全部 4 个工具——但通配不跨域，CRM 工具一个不带', () => {
+    const names = allowedToolEntries(systems, { userId: 'e004', role: 'hr_admin' }).map(
       (e) => e.spec.name,
     );
     expect(names).toEqual(['list_employees', 'get_employee', 'get_leave_balance', 'get_salary']);
   });
 
+  it('sales_manager（CRM 域通配）只见 CRM 的 2 个工具，HR 工具一个不带', () => {
+    const names = allowedToolEntries(systems, { userId: 'e005', role: 'sales_manager' }).map(
+      (e) => e.spec.name,
+    );
+    expect(names).toEqual(['list_accounts', 'get_opportunity']);
+  });
+
   it('未知角色注册 0 个工具', () => {
-    expect(allowedToolEntries([orangehrm], guard, { userId: 'x', role: 'intern' })).toEqual([]);
+    expect(allowedToolEntries(systems, { userId: 'x', role: 'intern' })).toEqual([]);
+  });
+
+  it('工具条目带回所属系统的守卫——按域裁决、按域审计的前提', () => {
+    const entries = allowedToolEntries(systems, { userId: 'e005', role: 'sales_manager' });
+    expect(entries.every((e) => e.adapter.system === 'espocrm')).toBe(true);
+    expect(entries.every((e) => e.guard === systems[1]?.guard)).toBe(true);
   });
 });
 
 describe('assertUniqueToolNames', () => {
   it('跨适配器同名工具在启动期抛错', () => {
-    const crm: SystemAdapter = {
+    const clashing: SystemAdapter = {
       system: 'crm',
       tools: () => [spec('get_employee')],
       execute: async () => ({ data: null }),
     };
-    expect(() => assertUniqueToolNames([orangehrm, crm])).toThrow(/get_employee/);
+    expect(() => assertUniqueToolNames([orangehrm, clashing])).toThrow(/get_employee/);
   });
 
   it('无冲突时不抛', () => {
-    expect(() => assertUniqueToolNames([orangehrm])).not.toThrow();
+    expect(() => assertUniqueToolNames([orangehrm, espocrm])).not.toThrow();
   });
 });
 

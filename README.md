@@ -3,8 +3,8 @@
 > Guarded MCP gateway for internal business systems — role-scoped tools, row/field-level data
 > guards, and a per-call audit trail.
 
-把内部系统（先做 HR）接到 MCP 上，并在协议层前面加一道守卫：谁、能用哪些工具、能看到哪些行哪些字段，
-问过什么都有账可查。
+把内部系统（先做 HR，现已加上 CRM 演示域）接到 MCP 上，并在协议层前面加一道守卫：
+谁、能用哪些工具、能看到哪些行哪些字段，问过什么都有账可查。
 
 **线上可体验**（免注册，两个链接问同一句「张三的工资是多少」）：
 [员工视角](https://dify.yiongspace.com/chat/kg6XFb18BoBfzHj2)结构化拒答 ·
@@ -39,8 +39,9 @@
 └──────────────────┬─────────────────────────┘
                    ▼
 ┌────────────────────────────────────────────┐
-│ SystemAdapter：orangehrm                    │    CRM / ERP …（路线图，今天没有）
+│ SystemAdapter：orangehrm（HR）              │    ERP …（路线图，今天没有）
 │   fixture / 只读 MySQL（真实 OrangeHRM 5.7） │
+│              ：espocrm（CRM，仅 fixture）    │
 │              ：memory（跨会话记忆，域内 RBAC）│
 └────────────────────────────────────────────┘
 ```
@@ -50,10 +51,10 @@
 模型想编也没材料。同一个人在飞书里换身份问同一句「张三的工资是多少」——员工被结构化
 拒答、HR 返回真实数字，全程留审计。搭建见 [packages/feishu](packages/feishu)。
 
-配套：`packages/eval` 是越权/泄漏评测——47 题（含跨会话记忆召回与越权记忆泄露）、
-硬断言 + LLM-judge 双轨（judge 须先过人工校准）、3 次重复报方差、守卫逐层开/关
-ablation 曲线。CI 的 eval-gate 在 fixture 上跑并上传报告；方法与实测数据见
-[docs/eval-methodology.md](docs/eval-methodology.md)。
+配套：`packages/eval` 是越权/泄漏评测——75 题跨三个域（HR 29 + 记忆 18 + CRM 28，
+含跨会话记忆泄露与跨域越权）、硬断言 + LLM-judge 双轨（judge 须先过人工校准）、
+3 次重复报方差、守卫逐层开/关 ablation 曲线。CI 的 eval-gate 在 fixture 上跑并上传
+报告；方法与实测数据见 [docs/eval-methodology.md](docs/eval-methodology.md)。
 
 ## Quickstart（fixture 模式，无需任何密钥）
 
@@ -90,6 +91,32 @@ curl -s http://localhost:3100/mcp \
 tail -3 audit/foundry.jsonl
 ```
 
+同一个网关还挂着第二个业务域（CRM，EspoCRM 形状的 fixture）。角色按域独立：
+销售看不到全员业绩盘，HR 的通配权力跨不进 CRM——
+
+```bash
+# 孙七（sales_rep）想看全员业绩盘 → 白名单拒绝（这工具在他的 tools/list 里根本不出现）
+curl -s http://localhost:3100/mcp \
+  -H 'content-type: application/json' \
+  -H 'accept: application/json, text/event-stream' \
+  -H 'x-foundry-user: e007' -H 'x-foundry-role: sales_rep' \
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_pipeline_summary","arguments":{}}}'
+
+# 王五（sales_manager）看业绩盘 → 正常返回
+curl -s http://localhost:3100/mcp \
+  -H 'content-type: application/json' \
+  -H 'accept: application/json, text/event-stream' \
+  -H 'x-foundry-user: e005' -H 'x-foundry-role: sales_manager' \
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_pipeline_summary","arguments":{}}}'
+
+# 老李（hr_admin，HR 域通配角色）摸 CRM 工具 → unknown_role：业务全权 ≠ 跨域全权
+curl -s http://localhost:3100/mcp \
+  -H 'content-type: application/json' \
+  -H 'accept: application/json, text/event-stream' \
+  -H 'x-foundry-user: e004' -H 'x-foundry-role: hr_admin' \
+  -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"list_accounts","arguments":{}}}'
+```
+
 ## 签名身份（生产模式，W3）
 
 demo 头谁都能自称 hr_admin。设 `FOUNDRY_IDENTITY_SECRET`（≥16 字符）后服务器只认
@@ -122,10 +149,15 @@ curl -s http://localhost:3100/mcp \
 
 ## 诚实边界
 
-- 已验证的只有 HR（OrangeHRM）这一条链路——fixture 与真实 OrangeHRM 5.7（只读 MySQL，
-  SELECT-only 账号）两种后端跑同一套 47 题评测均全绿；CRM/ERP 在路线图上，接口留了
-  适配器位，但今天没有实现。
-- 演示与评测数据都是 6 人演示口径（fixture 内置 / 真库种子脚本灌入），非生产数字。
+- 对真实系统验证过的只有 HR（OrangeHRM）——fixture 与真实 5.7（只读 MySQL，
+  SELECT-only 账号）双后端跑同一套题均全绿。CRM 域（espocrm 适配器）**只有 fixture
+  后端**：实体与字段按 EspoCRM 公开文档建模（[docs/espocrm-notes.md](docs/espocrm-notes.md)），
+  尚未对真实 EspoCRM 实例验证；ERP 仍是路线图。
+- 演示与评测数据都是演示口径（HR 6 人；CRM 5 客户 / 5 联系人 / 5 商机 / 3 个销售身份），
+  非生产数字。
+- 角色不跨域：demo 身份（employee/hr_admin）不在 CRM 域的 RBAC 里，所以两个线上体验
+  链接的工具面与行为**不因 CRM 域并入而改变**——线上网关是否已部署到含 CRM 的版本，
+  只影响能否用 sales_* 令牌访问 CRM 工具。
 - HTTP 入口的验签是共享密钥 HS256（W3）：签发方与验签方同持一把密钥，适合单网关部署；
   多签发方、密钥轮换要上非对称签名（JWKS），在路线图上。不设密钥时回落 demo 头模式
   （启动时打警告），仅供本地演示与评测。

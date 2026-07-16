@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createEspoCrmAdapter } from '@yiong/foundry-adapter-espocrm';
 import { createMemoryAdapter, MemoryStore } from '@yiong/foundry-adapter-memory';
 import {
   createOrangeHrmAdapter,
@@ -18,7 +19,7 @@ import { loadCases } from './schema.js';
 
 // 用法：node --import tsx src/cli.ts
 //   [--cases <yaml 文件或目录>]  缺省 cases/ 目录（全部 *.yaml 合并跑）
-//   [--config-dir <dir>]        缺省仓库根 config/（rbac.orangehrm.yaml + rbac.memory.yaml）
+//   [--config-dir <dir>]        缺省仓库根 config/（rbac.orangehrm.yaml + rbac.espocrm.yaml + rbac.memory.yaml）
 //   [--out <md>]                缺省 eval-reports/report.md
 //   [--repeat <n>]              重复跑 n 次并报方差（硬断言轨应为 0）
 //   [--ablation]                追加守卫逐层开/关的四档对照
@@ -103,6 +104,11 @@ async function main(): Promise<void> {
           ? createOrangeHrmAdapter({ backend: mysqlBackend })
           : createOrangeHrmAdapter(),
       rbac: loadRbacConfig(await readFile(join(configDir, 'rbac.orangehrm.yaml'), 'utf8')),
+    },
+    // espocrm 只有 fixture 后端（只读无状态）；真实 EspoCRM 后端在路线图（docs/espocrm-notes.md）
+    espocrm: {
+      createAdapter: () => createEspoCrmAdapter(),
+      rbac: loadRbacConfig(await readFile(join(configDir, 'rbac.espocrm.yaml'), 'utf8')),
     },
     memory: {
       createAdapter: () => createMemoryAdapter(new MemoryStore()),

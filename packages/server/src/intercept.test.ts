@@ -12,11 +12,30 @@ const fakeHr: SystemAdapter = {
   execute: async () => ({ data: [] }),
 };
 
-const rbac = loadRbacConfig(`
+const fakeCrm: SystemAdapter = {
+  system: 'fake-crm',
+  tools: () => [{ name: 'get_pipeline_summary', description: '业绩盘', inputSchema: z.object({}) }],
+  execute: async () => ({ data: [] }),
+};
+
+const hrRbac = loadRbacConfig(`
 roles:
   employee:
     tools: [list_employees]
+  hr_admin:
+    tools: "*"
 `);
+
+const crmRbac = loadRbacConfig(`
+roles:
+  sales_manager:
+    tools: "*"
+`);
+
+const buildSystems = (audit: MemoryAuditLogger) => [
+  { adapter: fakeHr, guard: new Guard(hrRbac, audit) },
+  { adapter: fakeCrm, guard: new Guard(crmRbac, audit) },
+];
 
 const callBody = (name: string) => ({
   jsonrpc: '2.0',
@@ -28,11 +47,9 @@ const callBody = (name: string) => ({
 describe('越权 tools/call 拦截', () => {
   it('白名单外但真实存在的工具：返回结构化拒答响应，且审计记 DENY', async () => {
     const audit = new MemoryAuditLogger();
-    const guard = new Guard(rbac, audit);
 
     const denied = await interceptDeniedToolCall(
-      [fakeHr],
-      guard,
+      buildSystems(audit),
       { userId: 'e002', role: 'employee' },
       callBody('get_salary'),
     );
@@ -44,12 +61,26 @@ describe('越权 tools/call 拦截', () => {
     expect(audit.events[0]?.decision).toBe('DENY');
   });
 
-  it('白名单内的工具：放行（返回 null 交给 SDK 正常处理）', async () => {
-    const guard = new Guard(rbac, new MemoryAuditLogger());
+  it('跨域越权：HR 通配角色摸 CRM 工具 → 按 CRM 域裁决 unknown_role，审计记在 CRM 域名下', async () => {
+    const audit = new MemoryAuditLogger();
 
     const denied = await interceptDeniedToolCall(
-      [fakeHr],
-      guard,
+      buildSystems(audit),
+      { userId: 'e004', role: 'hr_admin' },
+      callBody('get_pipeline_summary'),
+    );
+
+    expect(denied).not.toBeNull();
+    const text = (denied as { result: { content: [{ text: string }] } }).result.content[0].text;
+    expect(JSON.parse(text)).toMatchObject({ kind: 'refusal', reason: 'unknown_role' });
+    expect(audit.events).toHaveLength(1);
+    expect(audit.events[0]?.decision).toBe('DENY');
+    expect(audit.events[0]?.system).toBe('fake-crm');
+  });
+
+  it('白名单内的工具：放行（返回 null 交给 SDK 正常处理）', async () => {
+    const denied = await interceptDeniedToolCall(
+      buildSystems(new MemoryAuditLogger()),
       { userId: 'e002', role: 'employee' },
       callBody('list_employees'),
     );
@@ -58,11 +89,8 @@ describe('越权 tools/call 拦截', () => {
   });
 
   it('真不存在的工具：返回 null，由 SDK 报 not found', async () => {
-    const guard = new Guard(rbac, new MemoryAuditLogger());
-
     const denied = await interceptDeniedToolCall(
-      [fakeHr],
-      guard,
+      buildSystems(new MemoryAuditLogger()),
       { userId: 'e002', role: 'employee' },
       callBody('drop_database'),
     );
@@ -71,12 +99,9 @@ describe('越权 tools/call 拦截', () => {
   });
 
   it('非 tools/call 消息（tools/list、initialize）不拦截', async () => {
-    const guard = new Guard(rbac, new MemoryAuditLogger());
-
     for (const method of ['tools/list', 'initialize']) {
       const denied = await interceptDeniedToolCall(
-        [fakeHr],
-        guard,
+        buildSystems(new MemoryAuditLogger()),
         { userId: 'e002', role: 'employee' },
         { jsonrpc: '2.0', id: 1, method },
       );

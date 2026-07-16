@@ -13,6 +13,7 @@
     "calibrate": "node --import tsx src/calibrate-cli.ts"
   },
   "dependencies": {
+    "@yiong/foundry-adapter-espocrm": "workspace:*",
     "@yiong/foundry-adapter-memory": "workspace:*",
     "@yiong/foundry-adapter-orangehrm": "workspace:*",
     "@yiong/foundry-core": "workspace:*",

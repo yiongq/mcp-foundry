@@ -12,11 +12,25 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { AuditLogger, Principal, RbacConfig, SystemAdapter } from '@yiong/foundry-core';
 import { Guard } from '@yiong/foundry-core';
 import { type AuthConfig, resolvePrincipal } from './principal.js';
-import { allowedToolEntries, assertUniqueToolNames, toRawShape } from './registry.js';
+import {
+  allowedToolEntries,
+  assertUniqueToolNames,
+  type GuardedSystem,
+  toRawShape,
+} from './registry.js';
+
+/** 一个受服务的系统 = 适配器 × 该系统自己的 RBAC；守卫由服务器统一构建（共享同一审计流水）。 */
+export interface SystemBinding {
+  adapter: SystemAdapter;
+  rbac: RbacConfig;
+}
 
 export interface FoundryServerOptions {
-  adapters: readonly SystemAdapter[];
-  rbac: RbacConfig;
+  /**
+   * RBAC 按系统分治——通配角色（tools: "*"）的权力边界止步于本域，
+   * 别的域没登记这个角色就是 unknown_role（业务全权 ≠ 跨域全权）。
+   */
+  systems: readonly SystemBinding[];
   audit: AuditLogger;
   /** 鉴权模式；缺省 headers（demo 信任层），生产传 { mode: 'token', secret } */
   auth?: AuthConfig;
@@ -37,8 +51,7 @@ function sendJsonRpcError(res: ServerResponse, status: number, message: string):
  * 真不存在的工具返回 null，交给 SDK 报 not found。
  */
 export async function interceptDeniedToolCall(
-  adapters: readonly SystemAdapter[],
-  guard: Guard,
+  systems: readonly GuardedSystem[],
   principal: Principal,
   body: unknown,
 ): Promise<Record<string, unknown> | null> {
@@ -53,14 +66,17 @@ export async function interceptDeniedToolCall(
   if (typeof toolName !== 'string') return null;
 
   const allowed = new Set(
-    adapters.flatMap((a) => guard.allowedTools(a, principal).map((t) => t.name)),
+    systems.flatMap(({ adapter, guard }) =>
+      guard.allowedTools(adapter, principal).map((t) => t.name),
+    ),
   );
   if (allowed.has(toolName)) return null;
-  const owner = adapters.find((a) => a.tools().some((t) => t.name === toolName));
+  // 按名找到工具所属系统，交给该系统自己的守卫裁决——跨域越权未遂也按域记审计
+  const owner = systems.find(({ adapter }) => adapter.tools().some((t) => t.name === toolName));
   if (!owner) return null;
 
   const args = (msg.params?.arguments ?? {}) as Record<string, unknown>;
-  const result = await guard.invoke(owner, principal, { tool: toolName, args });
+  const result = await owner.guard.invoke(owner.adapter, principal, { tool: toolName, args });
   return {
     jsonrpc: '2.0',
     id: msg.id,
@@ -69,14 +85,17 @@ export async function interceptDeniedToolCall(
 }
 
 export function createFoundryServer(options: FoundryServerOptions): Server {
-  assertUniqueToolNames(options.adapters);
+  assertUniqueToolNames(options.systems.map((s) => s.adapter));
   const auth = options.auth ?? { mode: 'headers' as const };
-  const guard = new Guard(options.rbac, options.audit);
+  const systems: readonly GuardedSystem[] = options.systems.map(({ adapter, rbac }) => ({
+    adapter,
+    guard: new Guard(rbac, options.audit),
+  }));
   const serverInfo = { name: options.name ?? 'mcp-foundry', version: options.version ?? '0.0.1' };
 
   const buildMcpServer = (principal: Principal): McpServer => {
     const mcp = new McpServer(serverInfo);
-    for (const { adapter, spec } of allowedToolEntries(options.adapters, guard, principal)) {
+    for (const { adapter, guard, spec } of allowedToolEntries(systems, principal)) {
       mcp.registerTool(
         spec.name,
         { description: spec.description, inputSchema: toRawShape(spec.inputSchema, spec.name) },
@@ -110,7 +129,7 @@ export function createFoundryServer(options: FoundryServerOptions): Server {
       return;
     }
 
-    const denied = await interceptDeniedToolCall(options.adapters, guard, principal, body);
+    const denied = await interceptDeniedToolCall(systems, principal, body);
     if (denied) {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(denied));

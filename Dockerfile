@@ -10,12 +10,14 @@ RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/core/package.json packages/core/
 COPY packages/adapter-orangehrm/package.json packages/adapter-orangehrm/
+COPY packages/adapter-espocrm/package.json packages/adapter-espocrm/
 COPY packages/adapter-memory/package.json packages/adapter-memory/
 COPY packages/server/package.json packages/server/
 RUN pnpm install --frozen-lockfile --filter @yiong/foundry-server...
 
 COPY packages/core packages/core
 COPY packages/adapter-orangehrm packages/adapter-orangehrm
+COPY packages/adapter-espocrm packages/adapter-espocrm
 COPY packages/adapter-memory packages/adapter-memory
 COPY packages/server packages/server
 COPY config config

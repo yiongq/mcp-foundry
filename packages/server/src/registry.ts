@@ -1,19 +1,29 @@
 import type { Guard, Principal, SystemAdapter, ToolSpec } from '@yiong/foundry-core';
 import type { z } from 'zod';
 
+/**
+ * 一个受守卫的系统 = 适配器 × 该系统自己的守卫。RBAC 按系统分治
+ * （与飞书入口的 GuardedToolset、评测 runner 的 systems 同构）——
+ * 通配角色（tools: "*"）的权力边界止步于本域，跨域即 unknown_role。
+ */
+export interface GuardedSystem {
+  adapter: SystemAdapter;
+  guard: Guard;
+}
+
 export interface ToolEntry {
   adapter: SystemAdapter;
+  guard: Guard;
   spec: ToolSpec;
 }
 
 /** tools/list 阶段就按角色收窄——不在白名单里的工具连列表都不出现。 */
 export function allowedToolEntries(
-  adapters: readonly SystemAdapter[],
-  guard: Guard,
+  systems: readonly GuardedSystem[],
   principal: Principal,
 ): ToolEntry[] {
-  return adapters.flatMap((adapter) =>
-    guard.allowedTools(adapter, principal).map((spec) => ({ adapter, spec })),
+  return systems.flatMap(({ adapter, guard }) =>
+    guard.allowedTools(adapter, principal).map((spec) => ({ adapter, guard, spec })),
   );
 }
 

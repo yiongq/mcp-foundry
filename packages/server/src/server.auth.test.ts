@@ -33,8 +33,7 @@ let baseUrl: string;
 
 beforeAll(async () => {
   server = createFoundryServer({
-    adapters: [fakeHr],
-    rbac,
+    systems: [{ adapter: fakeHr, rbac }],
     audit: new MemoryAuditLogger(),
     auth: { mode: 'token', secret: SECRET },
   });
