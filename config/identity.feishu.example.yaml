@@ -5,7 +5,11 @@
 # 权限本身仍在 rbac.*.yaml——绑定错了最多拿到错误身份的权限面，不会越过守卫。
 # 未绑定的用户发消息时，bot 会回复其 open_id，复制进来重启即可。
 #
-# 演示身份参考：小王 = { userId: e002, role: employee }；老李 = { userId: e004, role: hr_admin }
-# 同一个 open_id 在 employee 与 hr_admin 之间切换，即可演示"同问不同答"的权限对比。
+# 演示身份参考：小王 = { userId: e002, role: employee }；老李 = { userId: e004, role: hr_admin }；
+# CRM 域：孙七 = { userId: e007, role: sales_rep }；王五 = { userId: e005, role: sales_manager }。
+# 同一个 open_id 在 employee 与 hr_admin 之间切换，即可演示"同问不同答"的权限对比；
+# 切成 sales_* 则工具面换成 CRM 五工具 + 私有记忆（HR 域不认这些角色，反之亦然——
+# 角色不跨域；记忆域所有角色一律只见自己）。
 identities: {}
   # ou_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: { userId: e002, role: employee }
+  # ou_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: { userId: e007, role: sales_rep }

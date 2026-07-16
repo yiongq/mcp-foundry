@@ -38,7 +38,7 @@ export ESPOCRM_MYSQL_USER=foundry_ro
 export ESPOCRM_MYSQL_PASSWORD=foundry_ro_pw
 # 可选：ESPOCRM_MYSQL_DATABASE（缺省 espocrm）
 
-# 75 题评测直接打真库（可与 ORANGEHRM_MYSQL_* 同时设，双域双真库）
+# 全量评测直接打真库（可与 ORANGEHRM_MYSQL_* 同时设，双域双真库）
 pnpm --filter @yiong/foundry-eval run eval --repeat 3 --ablation
 # MCP server 挂真库
 pnpm --filter @yiong/foundry-server run serve

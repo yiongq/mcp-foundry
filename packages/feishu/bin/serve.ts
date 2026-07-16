@@ -5,12 +5,17 @@
  *   FEISHU_APP_ID / FEISHU_APP_SECRET      —— 企业自建应用凭据
  *   FOUNDRY_LLM_BASE_URL / _API_KEY / _MODEL —— OpenAI 兼容对话模型
  *   ORANGEHRM_MYSQL_*（可选）              —— 有则 HR 数据走真实 OrangeHRM 只读库，否则 fixture
+ *   ESPOCRM_MYSQL_*（可选）                —— 有则 CRM 数据走真实 EspoCRM 只读库，否则 fixture
  */
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import {
+  createEspoCrmAdapter,
+  mysqlConfigFromEnv as espoMysqlConfigFromEnv,
+} from '@yiong/foundry-adapter-espocrm';
 import { createMemoryAdapter, MemoryStore } from '@yiong/foundry-adapter-memory';
-import { createOrangeHrmAdapter } from '@yiong/foundry-adapter-orangehrm';
+import { createOrangeHrmAdapter, mysqlConfigFromEnv } from '@yiong/foundry-adapter-orangehrm';
 import { Guard, JsonlAuditLogger, loadRbacConfig } from '@yiong/foundry-core';
 import { startBot } from '../src/bot.js';
 import { loadIdentityMap } from '../src/identity.js';
@@ -44,6 +49,9 @@ const repoRoot = new URL('../../../', import.meta.url);
 loadDotEnv(new URL('../.env', import.meta.url));
 
 const rbacHr = loadRbacConfig(await readFile(new URL('config/rbac.orangehrm.yaml', repoRoot), 'utf8'));
+const rbacCrm = loadRbacConfig(
+  await readFile(new URL('config/rbac.espocrm.yaml', repoRoot), 'utf8'),
+);
 const rbacMemory = loadRbacConfig(
   await readFile(new URL('config/rbac.memory.yaml', repoRoot), 'utf8'),
 );
@@ -68,12 +76,17 @@ const audit = new JsonlAuditLogger(fileURLToPath(new URL('audit/foundry.jsonl', 
 const memoryStore = new MemoryStore();
 const toolset = new GuardedToolset([
   { adapter: createOrangeHrmAdapter(), guard: new Guard(rbacHr, audit) },
+  { adapter: createEspoCrmAdapter(), guard: new Guard(rbacCrm, audit) },
   { adapter: createMemoryAdapter(memoryStore), guard: new Guard(rbacMemory, audit) },
 ]);
 
 const boundCount = Object.keys(identityMap).length;
+// 日志与适配器用同一套探测（host+user+password 齐才算真库）——env 不全时适配器
+// 静默回落 fixture，日志绝不能反着说"已连真库"（真机复验的口径就毁在这种误报上）
+const hrMysql = mysqlConfigFromEnv(process.env);
+const crmMysql = espoMysqlConfigFromEnv(process.env);
 console.log(
-  `[bot] 身份绑定 ${boundCount} 人；HR 后端：${process.env.ORANGEHRM_MYSQL_HOST ? `只读 MySQL ${process.env.ORANGEHRM_MYSQL_HOST}` : 'fixture'}`,
+  `[bot] 身份绑定 ${boundCount} 人；HR 后端：${hrMysql ? `只读 MySQL ${hrMysql.host}:${hrMysql.port}` : 'fixture'}；CRM 后端：${crmMysql ? `只读 MySQL ${crmMysql.host}:${crmMysql.port}` : 'fixture'}`,
 );
 
 const bot = await startBot({

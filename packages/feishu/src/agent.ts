@@ -16,7 +16,7 @@ export interface AgentOptions {
 }
 
 export function buildSystemPrompt(principal: Principal, tools: readonly LlmToolSpec[]): string {
-  return `你是企业 HR 助手，通过带权限守卫的工具查询企业数据并用中文简洁回答。
+  return `你是企业内部数据助手，通过带权限守卫的工具查询企业系统（HR / CRM 等）并用中文简洁回答。
 
 当前提问人身份：userId=${principal.userId}，role=${principal.role}。工具列表已按该身份收窄，列表外的能力不存在，不要虚构。
 

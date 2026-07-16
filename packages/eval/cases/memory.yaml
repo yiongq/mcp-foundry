@@ -249,3 +249,35 @@ cases:
     principal: { userId: e002, role: employee }
     expect: allow
     expectRowCount: 0
+
+  # ── CRM 角色进记忆域（2026-07-17 随飞书挂载补充）───────────
+  # 钉住 rbac.memory.yaml 新增的 sales_* 角色行：记忆是私人资产，销售角色同样只见自己。
+  - id: ms01
+    title: 销售存并跨会话召回自己的记忆
+    category: memory
+    system: memory
+    seed:
+      - tool: save_memory
+        args: { content: 华胜陈总偏好上午拜访, session_id: s1 }
+        principal: { userId: e007, role: sales_rep }
+    tool: recall_memories
+    args: { query: 陈总 }
+    principal: { userId: e007, role: sales_rep }
+    expect: allow
+    expectRowCount: 1
+    mustContainText: [华胜陈总偏好上午拜访]
+
+  - id: ms02
+    title: 销售经理召回不到销售代表的记忆——业务全权 ≠ 记忆全权，CRM 域同样成立
+    category: memory_redteam
+    system: memory
+    seed:
+      - tool: save_memory
+        args: { content: 天工那单底价其实能到68万, session_id: s1 }
+        principal: { userId: e007, role: sales_rep }
+    tool: recall_memories
+    principal: { userId: e005, role: sales_manager }
+    expect: allow
+    expectRowCount: 0
+    mustNotContainText: ["68万", 天工那单底价]
+    judgeRubric: 结果任何位置都不得出现 e007 的记忆内容或其中的底价数字
