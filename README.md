@@ -35,10 +35,14 @@ MCP 客户端（Claude Code / 任意支持 Streamable HTTP 的 host）
                    ▼
 ┌────────────────────────────────────────────┐
 │ SystemAdapter：orangehrm（fixture / 真实API）│    CRM / ERP …（路线图，今天没有）
+│              ：memory（跨会话记忆，域内 RBAC）│
 └────────────────────────────────────────────┘
 ```
 
-配套：`packages/eval` 是越权/泄漏评测，CI 的 eval-gate 任务在 fixture 上跑并上传报告。
+配套：`packages/eval` 是越权/泄漏评测——47 题（含跨会话记忆召回与越权记忆泄露）、
+硬断言 + LLM-judge 双轨（judge 须先过人工校准）、3 次重复报方差、守卫逐层开/关
+ablation 曲线。CI 的 eval-gate 在 fixture 上跑并上传报告；方法与实测数据见
+[docs/eval-methodology.md](docs/eval-methodology.md)。
 
 ## Quickstart（fixture 模式，无需任何密钥）
 
