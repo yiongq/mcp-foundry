@@ -7,6 +7,8 @@ import type {
 } from '@yiong/foundry-core';
 import type { EspoCrmBackend } from './backend.js';
 import { FixtureBackend } from './fixtures.js';
+import type { MySqlBackendOptions } from './mysql.js';
+import { MySqlEspoCrmBackend } from './mysql.js';
 import {
   accountIdInput,
   contactIdInput,
@@ -19,15 +21,52 @@ import {
 
 export interface EspoCrmAdapterOptions {
   /**
-   * 直接注入后端实例；缺省 fixture（内置演示数据）。
-   * 真实 EspoCRM 后端（只读 MySQL）在路线图上——见 docs/espocrm-notes.md，
-   * 届时与 orangehrm 同款：环境变量探测 + mode 显式指定。
+   * 后端选择优先级：backend 注入 > mode 显式指定 > 环境变量探测 > fixture。
+   * 环境变量：ESPOCRM_MYSQL_HOST + ESPOCRM_MYSQL_USER + ESPOCRM_MYSQL_PASSWORD
+   * （库名缺省 espocrm、端口缺省 3306）。真库对接见 docs/espocrm-db-schema.md。
    */
+  mode?: 'fixture' | 'mysql';
+  /** 直接注入后端实例（评测多题共享一个连接池就靠它） */
   backend?: EspoCrmBackend;
+  mysql?: MySqlBackendOptions;
+  /** 测试注入用；缺省 process.env */
+  env?: Record<string, string | undefined>;
 }
 
 export function createEspoCrmAdapter(options: EspoCrmAdapterOptions = {}): SystemAdapter {
-  return new EspoCrmAdapter(options.backend ?? new FixtureBackend());
+  return new EspoCrmAdapter(selectBackend(options));
+}
+
+function selectBackend(options: EspoCrmAdapterOptions): EspoCrmBackend {
+  if (options.backend !== undefined) return options.backend;
+  const env = options.env ?? process.env;
+  const mysqlConfig = options.mysql ?? mysqlConfigFromEnv(env);
+  const mode = options.mode ?? (mysqlConfig ? 'mysql' : 'fixture');
+  if (mode === 'mysql') {
+    if (!mysqlConfig) {
+      throw new Error(
+        'espocrm MySQL 模式需要 ESPOCRM_MYSQL_HOST + ESPOCRM_MYSQL_USER + ESPOCRM_MYSQL_PASSWORD',
+      );
+    }
+    return new MySqlEspoCrmBackend(mysqlConfig);
+  }
+  return new FixtureBackend();
+}
+
+export function mysqlConfigFromEnv(
+  env: Record<string, string | undefined>,
+): MySqlBackendOptions | null {
+  const host = env.ESPOCRM_MYSQL_HOST;
+  const user = env.ESPOCRM_MYSQL_USER;
+  const password = env.ESPOCRM_MYSQL_PASSWORD;
+  if (!host || !user || password === undefined) return null;
+  return {
+    host,
+    port: Number(env.ESPOCRM_MYSQL_PORT ?? '3306'),
+    database: env.ESPOCRM_MYSQL_DATABASE ?? 'espocrm',
+    user,
+    password,
+  };
 }
 
 class EspoCrmAdapter implements SystemAdapter {

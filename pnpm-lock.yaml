@@ -23,6 +23,9 @@ importers:
       '@yiong/foundry-core':
         specifier: workspace:*
         version: link:../core
+      mysql2:
+        specifier: ^3.11.0
+        version: 3.23.0(@types/node@26.1.1)
       zod:
         specifier: ^3.24.0
         version: 3.25.76

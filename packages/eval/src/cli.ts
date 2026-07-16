@@ -1,7 +1,11 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createEspoCrmAdapter } from '@yiong/foundry-adapter-espocrm';
+import {
+  createEspoCrmAdapter,
+  mysqlConfigFromEnv as espoMysqlConfigFromEnv,
+  MySqlEspoCrmBackend,
+} from '@yiong/foundry-adapter-espocrm';
 import { createMemoryAdapter, MemoryStore } from '@yiong/foundry-adapter-memory';
 import {
   createOrangeHrmAdapter,
@@ -97,6 +101,12 @@ async function main(): Promise<void> {
   console.log(
     `orangehrm 后端：${mysqlBackend !== null ? `只读 MySQL ${mysqlConfig?.host}:${mysqlConfig?.port}/${mysqlConfig?.database}` : 'fixture（内置演示数据）'}`,
   );
+  const espoMysqlConfig = espoMysqlConfigFromEnv(process.env);
+  const espoMysqlBackend =
+    espoMysqlConfig === null ? null : new MySqlEspoCrmBackend(espoMysqlConfig);
+  console.log(
+    `espocrm 后端：${espoMysqlBackend !== null ? `只读 MySQL ${espoMysqlConfig?.host}:${espoMysqlConfig?.port}/${espoMysqlConfig?.database}` : 'fixture（内置演示数据）'}`,
+  );
   const systems: Record<string, EvalSystem> = {
     orangehrm: {
       createAdapter: () =>
@@ -105,9 +115,12 @@ async function main(): Promise<void> {
           : createOrangeHrmAdapter(),
       rbac: loadRbacConfig(await readFile(join(configDir, 'rbac.orangehrm.yaml'), 'utf8')),
     },
-    // espocrm 只有 fixture 后端（只读无状态）；真实 EspoCRM 后端在路线图（docs/espocrm-notes.md）
+    // espocrm 两个后端都只读无状态，MySQL 模式（ESPOCRM_MYSQL_*）全部题共享一个连接池
     espocrm: {
-      createAdapter: () => createEspoCrmAdapter(),
+      createAdapter: () =>
+        espoMysqlBackend !== null
+          ? createEspoCrmAdapter({ backend: espoMysqlBackend })
+          : createEspoCrmAdapter(),
       rbac: loadRbacConfig(await readFile(join(configDir, 'rbac.espocrm.yaml'), 'utf8')),
     },
     memory: {
@@ -169,6 +182,7 @@ async function main(): Promise<void> {
 
   // 连接池不收口 Node 进程不退出
   if (mysqlBackend !== null) await mysqlBackend.end();
+  if (espoMysqlBackend !== null) await espoMysqlBackend.end();
 }
 
 main().catch((err: unknown) => {

@@ -1,5 +1,5 @@
 export type { EspoCrmAdapterOptions } from './adapter.js';
-export { createEspoCrmAdapter } from './adapter.js';
+export { createEspoCrmAdapter, mysqlConfigFromEnv } from './adapter.js';
 export type {
   AccountDetail,
   AccountRow,
@@ -15,3 +15,5 @@ export {
   FIXTURE_OWNERS,
   FixtureBackend,
 } from './fixtures.js';
+export type { MySqlBackendOptions, SqlExecutor } from './mysql.js';
+export { MySqlEspoCrmBackend } from './mysql.js';

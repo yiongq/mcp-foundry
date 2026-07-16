@@ -1,9 +1,9 @@
 /**
- * 六个工具的统一行结构（fixture 与未来的只读 MySQL 后端都必须映射到这套形状）。
+ * 六个工具的统一行结构（fixture 与只读 MySQL 两个后端都必须映射到这套形状）。
  * 字段名刻意用 snake_case——与 RBAC 行规则里的 field（owner_id）逐字对齐。
  * 实体与字段按 EspoCRM 建模（Account / Contact / Opportunity，
- * assigned_user_id 归一为 owner_id），映射依据见 docs/espocrm-notes.md；
- * 尚未对真实 EspoCRM 实例验证。
+ * assigned_user_id 归一为 owner_id），映射已对真实 EspoCRM 9.3 实测验证，
+ * 依据见 docs/espocrm-db-schema.md。
  */
 export interface AccountRow {
   account_id: string;
@@ -49,7 +49,7 @@ export interface PipelineSummaryRow {
   won_amount: number;
 }
 
-/** 数据来源抽象：fixture（内置演示数据）今天唯一实现；真实 EspoCRM（只读 MySQL）在路线图。 */
+/** 数据来源抽象：fixture（内置演示数据）与只读 MySQL（真实 EspoCRM）各实现一份。 */
 export interface EspoCrmBackend {
   listAccounts(industry?: string): Promise<AccountRow[]>;
   getAccount(accountId: string): Promise<AccountDetail | null>;

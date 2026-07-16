@@ -41,7 +41,8 @@
 ┌────────────────────────────────────────────┐
 │ SystemAdapter：orangehrm（HR）              │    ERP …（路线图，今天没有）
 │   fixture / 只读 MySQL（真实 OrangeHRM 5.7） │
-│              ：espocrm（CRM，仅 fixture）    │
+│              ：espocrm（CRM）                │
+│   fixture / 只读 MySQL（真实 EspoCRM 9.3）   │
 │              ：memory（跨会话记忆，域内 RBAC）│
 └────────────────────────────────────────────┘
 ```
@@ -149,10 +150,10 @@ curl -s http://localhost:3100/mcp \
 
 ## 诚实边界
 
-- 对真实系统验证过的只有 HR（OrangeHRM）——fixture 与真实 5.7（只读 MySQL，
-  SELECT-only 账号）双后端跑同一套题均全绿。CRM 域（espocrm 适配器）**只有 fixture
-  后端**：实体与字段按 EspoCRM 公开文档建模（[docs/espocrm-notes.md](docs/espocrm-notes.md)），
-  尚未对真实 EspoCRM 实例验证；ERP 仍是路线图。
+- 两条业务链路都已对真实系统验证：HR 对真实 OrangeHRM 5.7、CRM 对真实 EspoCRM 9.3
+  （都是只读 MySQL、SELECT-only 账号），fixture 与真库双后端跑同一套 75 题均全绿，
+  双域双真库组合亦全绿（[docs/espocrm-notes.md](docs/espocrm-notes.md)）；「已验证」
+  指本地 docker 真库、演示数据口径，不是生产环境；ERP 仍是路线图。
 - 演示与评测数据都是演示口径（HR 6 人；CRM 5 客户 / 5 联系人 / 5 商机 / 3 个销售身份），
   非生产数字。
 - 角色不跨域：demo 身份（employee/hr_admin）不在 CRM 域的 RBAC 里，所以两个线上体验
@@ -168,8 +169,8 @@ curl -s http://localhost:3100/mcp \
 - **线上演示的身份是"配好的"，不是"登录来的"**：两个体验链接各自绑死一枚长效令牌，
   访客点开即是该身份，不能自己切换——这演示的是「同一网关、不同身份、行为不同」，
   不是一套面向访客的登录系统。生产接法是网关/SSO 在用户登录后按其真实身份签发令牌。
-- 线上跑的是 fixture 后端（6 人演示数据），不连真实 OrangeHRM——真库那条链路只在
-  本地验证过（只读 MySQL，SELECT-only 账号）。
+- 线上跑的是 fixture 后端（演示数据），不连真实 OrangeHRM/EspoCRM——两条真库链路都
+  只在本地验证过（只读 MySQL，SELECT-only 账号）。
 - 演示令牌 TTL 一年（2027-07 到期）。过期后演示会静默失效——届时用 mint-token 重签
   并更新 Dify 的 MCP server header。
 

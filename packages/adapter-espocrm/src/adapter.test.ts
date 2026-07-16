@@ -4,7 +4,8 @@ import { Guard, loadRbacConfig, MemoryAuditLogger } from '@yiong/foundry-core';
 import { describe, expect, it } from 'vitest';
 import { createEspoCrmAdapter } from './adapter.js';
 
-const adapter = createEspoCrmAdapter();
+// env: {} 保证测试不受本机 ESPOCRM_* 环境变量影响，始终走 fixture
+const adapter = createEspoCrmAdapter({ env: {} });
 // 直调 execute 需要身份占位——espocrm 适配器不读它（权限在守卫层），传谁都一样
 const CALLER: Principal = { userId: 'e000', role: 'test' };
 
