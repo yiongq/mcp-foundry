@@ -78,7 +78,7 @@ export class Guard {
     try {
       ({ data } = await adapter.execute(call, principal));
     } catch (err) {
-      return done({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      return done({ kind: 'error', message: normalizeErrorMessage(err) });
     }
 
     if (!this.disabled.has('row_filter')) {
@@ -92,6 +92,26 @@ export class Guard {
     const mask = this.disabled.has('field_mask') ? [] : (role?.mask ?? []);
     return done({ kind: 'ok', data: maskFields(data, mask), maskedFields: mask });
   }
+}
+
+/**
+ * 错误分支也是出口：zod 的 err.message 是原始 issue 对象的 JSON 转储
+ * （含 code/expected 等内部字段），不能原样透传——LLM-judge 校准后第一轮
+ * 双轨评测抓到的真实出口污染。这里压成「字段路径: 人话」，够定位、不漏内部结构。
+ * 用 name + issues 鸭子类型判别而非 instanceof——跨包两份 zod 实例时 instanceof 会误判。
+ */
+function normalizeErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const issues = (err as { issues?: Array<{ path?: Array<string | number>; message?: string }> })
+    .issues;
+  if (err.name === 'ZodError' && Array.isArray(issues)) {
+    const parts = issues.map(
+      (issue) =>
+        `${issue.path !== undefined && issue.path.length > 0 ? issue.path.join('.') : '(根)'}: ${issue.message ?? '不合法'}`,
+    );
+    return `参数校验失败——${parts.join('；')}`;
+  }
+  return err.message;
 }
 
 type RowFilterOutcome = { denied: false; data: unknown } | { denied: true; rule: string };

@@ -111,6 +111,29 @@ describe('守卫管线', () => {
     expect(names).toEqual(['list_employees']);
   });
 
+  it('zod 校验错误被压成人话——error 分支不透传 code/expected 等内部字段', async () => {
+    const strictInput = z.object({ employee_id: z.string().min(1) });
+    const picky: SystemAdapter = {
+      system: 'picky',
+      tools: () => [{ name: 'lookup', description: 'lookup', inputSchema: strictInput }],
+      execute: async (call) => {
+        strictInput.parse(call.args);
+        return { data: null };
+      },
+    };
+    const guard = new Guard(rbac, new MemoryAuditLogger());
+
+    const result = await guard.invoke(picky, LAO_LI, { tool: 'lookup', args: {} });
+
+    expect(result.kind).toBe('error');
+    if (result.kind !== 'error') return;
+    expect(result.message).toContain('参数校验失败');
+    expect(result.message).toContain('employee_id');
+    // zod 原始 issue 转储的内部字段不得出现
+    expect(result.message).not.toContain('"code"');
+    expect(result.message).not.toContain('invalid_type');
+  });
+
   it('适配器抛错 → error 分支，不夹带业务数据，审计记 ERROR', async () => {
     const audit = new MemoryAuditLogger();
     const guard = new Guard(rbac, audit);
