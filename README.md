@@ -6,6 +6,12 @@
 把内部系统（先做 HR）接到 MCP 上，并在协议层前面加一道守卫：谁、能用哪些工具、能看到哪些行哪些字段，
 问过什么都有账可查。
 
+**线上可体验**（免注册，两个链接问同一句「张三的工资是多少」）：
+[员工视角](https://dify.yiongspace.com/chat/kg6XFb18BoBfzHj2)结构化拒答 ·
+[HR 视角](https://dify.yiongspace.com/chat/CP3QrYkheA2Zz6P5)返回真实数字。
+两个应用连的是**同一个网关地址**（`https://foundry.yiongspace.com/mcp`），只有身份令牌不同——
+员工那个的工具面里根本没有 `get_salary`，不是模型忍住不说。
+
 ## 为什么做：三个事故 → 三个能力
 
 给 Agent 接内部系统，出的事基本是三类：普通员工顺嘴一问就拿到了同事的工资（没有行级边界）；
@@ -108,10 +114,11 @@ curl -s http://localhost:3100/mcp \
 过期 → 401；验签不读令牌自述的 alg，"alg: none" 一类降级攻击在结构上不成立。
 飞书入口不走这条：sender open_id 由飞书服务端签发，本身就是可信身份源。
 
-签名令牌让第三方 Agent 平台零代码接入：Dify 已实测（1.16，本地 Docker）——
-同一个 foundry 地址挂两个 MCP server、只有令牌不同，两个 Agent 应用的工具面
-在 Dify 界面里肉眼可见地不同（employee 3 个工具 / hr_admin 4 个），同问不同答、
-审计留痕。步骤与踩坑见 [docs/dify-integration.md](docs/dify-integration.md)。
+签名令牌让第三方 Agent 平台零代码接入：Dify 已实测并**上了公网**（自托管 1.16）——
+同一个网关地址挂两个 MCP server、只有令牌不同，两个 Agent 应用的工具面在 Dify 界面里
+肉眼可见地不同（employee 3 个工具 / hr_admin 4 个），同问不同答、审计留痕（上面的两个
+体验链接就是它们）。接入步骤与踩坑见 [docs/dify-integration.md](docs/dify-integration.md)，
+上线清单见 [DEPLOY-CHECKLIST.md](DEPLOY-CHECKLIST.md)。
 
 ## 诚实边界
 
@@ -126,6 +133,13 @@ curl -s http://localhost:3100/mcp \
   hr_admin 正常出数、审计留痕）；演示数据仍是 6 人 fixture 口径。
 - 行级/字段规则只在 Guard 出口生效：绕过 Foundry 直连源系统它管不到——部署上要求源系统凭据只发给
   Foundry。
+- **线上演示的身份是"配好的"，不是"登录来的"**：两个体验链接各自绑死一枚长效令牌，
+  访客点开即是该身份，不能自己切换——这演示的是「同一网关、不同身份、行为不同」，
+  不是一套面向访客的登录系统。生产接法是网关/SSO 在用户登录后按其真实身份签发令牌。
+- 线上跑的是 fixture 后端（6 人演示数据），不连真实 OrangeHRM——真库那条链路只在
+  本地验证过（只读 MySQL，SELECT-only 账号）。
+- 演示令牌 TTL 一年（2027-07 到期）。过期后演示会静默失效——届时用 mint-token 重签
+  并更新 Dify 的 MCP server header。
 
 ## 名称说明
 
