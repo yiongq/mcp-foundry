@@ -1,9 +1,17 @@
+import type { AblationPoint } from './ablation.js';
+import type { RepeatStats } from './repeat.js';
 import type { EvalRunResult } from './runner.js';
 import { describeExpectation, describeResult } from './runner.js';
 
 export interface RenderReportOptions {
   /** 固定时间戳便于快照测试；缺省取当前时间 */
   generatedAt?: string;
+  /** judge 状态说明；缺省视为未启用 */
+  judgeInfo?: string;
+  /** ≥2 次重复跑时渲染方差 section */
+  repeat?: RepeatStats;
+  /** ablation 阶梯结果（全开档之外的三档只进这一节，不影响门禁） */
+  ablation?: readonly AblationPoint[];
 }
 
 export function renderReport(run: EvalRunResult, options: RenderReportOptions = {}): string {
@@ -19,6 +27,7 @@ export function renderReport(run: EvalRunResult, options: RenderReportOptions = 
       `（通过率 ${rate(summary.passed, summary.total)}）`,
   );
   lines.push(`- 红队门禁（expect refuse/error）：${run.redTeamFailed ? '未通过' : '通过'}`);
+  lines.push(`- LLM-judge 软轨：${options.judgeInfo ?? '未启用（硬断言单轨）'}`);
   lines.push('');
 
   lines.push('## 分类总览');
@@ -32,6 +41,14 @@ export function renderReport(run: EvalRunResult, options: RenderReportOptions = 
     );
   }
   lines.push('');
+
+  if (options.repeat !== undefined && options.repeat.runs > 1) {
+    lines.push(...renderRepeatSection(options.repeat));
+  }
+
+  if (options.ablation !== undefined && options.ablation.length > 0) {
+    lines.push(...renderAblationSection(options.ablation));
+  }
 
   lines.push('## 失败明细');
   lines.push('');
@@ -61,6 +78,54 @@ export function renderReport(run: EvalRunResult, options: RenderReportOptions = 
   lines.push(`| ERROR | ${counts.ERROR} |`);
 
   return `${lines.join('\n')}\n`;
+}
+
+/** 方差不是走过场：硬断言轨报 0 证明确定性，接入 judge 后 >0 立刻暴露不稳定题。 */
+function renderRepeatSection(stats: RepeatStats): string[] {
+  const lines: string[] = [];
+  lines.push(`## 重复运行（${stats.runs} 次）`);
+  lines.push('');
+  lines.push(`- 各次通过数：${stats.passCounts.join(' / ')}`);
+  lines.push(
+    `- 通过率均值 ${(stats.meanPassRate * 100).toFixed(1)}%，` +
+      `标准差 ${(stats.stddevPassRate * 100).toFixed(2)} 个百分点`,
+  );
+  if (stats.flakyCaseIds.length === 0) {
+    lines.push('- 无摇摆题：全部用例每次结果一致');
+  } else {
+    lines.push(`- **摇摆题（各次结果不一致）**：${stats.flakyCaseIds.join(', ')}`);
+  }
+  lines.push('');
+  return lines;
+}
+
+/** 守卫逐层开启的分数阶梯——安全层的价值以分数差呈现，而不是一句口号。 */
+function renderAblationSection(points: readonly AblationPoint[]): string[] {
+  const lines: string[] = [];
+  lines.push('## 守卫 Ablation（逐层开启）');
+  lines.push('');
+  lines.push('| 守卫配置 | 通过率 | 红队拦截率 | 泄漏题数 |');
+  lines.push('| --- | ---: | ---: | ---: |');
+  for (const p of points) {
+    lines.push(
+      `| ${p.config.label} | ${rate(p.passed, p.total)} ` +
+        `| ${rate(p.redTeamIntercepted, p.redTeamTotal)} | ${p.leakCount} |`,
+    );
+  }
+  lines.push('');
+  lines.push('红队拦截率曲线：');
+  lines.push('');
+  lines.push('```');
+  const labelWidth = Math.max(...points.map((p) => p.config.label.length));
+  for (const p of points) {
+    const ratio = p.redTeamTotal === 0 ? 0 : p.redTeamIntercepted / p.redTeamTotal;
+    const bar = '█'.repeat(Math.round(ratio * 20)).padEnd(20, '·');
+    const label = p.config.label.padEnd(labelWidth, '　');
+    lines.push(`${label} ${bar} ${(ratio * 100).toFixed(0).padStart(3)}%`);
+  }
+  lines.push('```');
+  lines.push('');
+  return lines;
 }
 
 function rate(passed: number, total: number): string {

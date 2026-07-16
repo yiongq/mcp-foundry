@@ -1,12 +1,13 @@
 import type {
   AuditEvent,
   GuardedResult,
+  GuardLayer,
   Principal,
   RbacConfig,
   SystemAdapter,
 } from '@yiong/foundry-core';
 import { Guard, MemoryAuditLogger } from '@yiong/foundry-core';
-import type { EvalCase } from './schema.js';
+import type { EvalCase, EvalPrincipal, EvalSeedStep } from './schema.js';
 
 export interface CaseOutcome {
   evalCase: EvalCase;
@@ -30,18 +31,25 @@ export interface EvalSummary {
 }
 
 /**
- * W2 预留：LLM-judge 软判定轨。硬断言轨先跑且不可被翻案——
+ * LLM-judge 软判定轨。硬断言轨先跑且不可被翻案——
  * judge 只能把「硬断言通过」的题追加判失败，不能救回硬断言失败的题。
  */
 export interface SoftJudge {
   judge(evalCase: EvalCase, actual: GuardedResult): Promise<{ pass: boolean; rationale: string }>;
 }
 
-export interface RunEvalOptions {
-  adapter: SystemAdapter;
+/** 一个受评系统 = 适配器工厂 × 该系统自己的 RBAC。工厂保证每题状态隔离。 */
+export interface EvalSystem {
+  createAdapter: () => SystemAdapter;
   rbac: RbacConfig;
+}
+
+export interface RunEvalOptions {
+  systems: Record<string, EvalSystem>;
   cases: EvalCase[];
   judge?: SoftJudge;
+  /** 仅供 ablation 对照跑：按层关闭守卫，量化每层的分数贡献 */
+  disabledLayers?: readonly GuardLayer[];
 }
 
 export interface EvalRunResult {
@@ -54,17 +62,10 @@ export interface EvalRunResult {
 
 export async function runEval(options: RunEvalOptions): Promise<EvalRunResult> {
   const audit = new MemoryAuditLogger();
-  const guard = new Guard(options.rbac, audit);
   const outcomes: CaseOutcome[] = [];
 
   for (const evalCase of options.cases) {
-    const actual = await invokeGuarded(guard, options.adapter, evalCase);
-    const failures = assertCase(evalCase, actual);
-    if (options.judge !== undefined && failures.length === 0) {
-      const verdict = await options.judge.judge(evalCase, actual);
-      if (!verdict.pass) failures.push(`LLM-judge 不通过: ${verdict.rationale}`);
-    }
-    outcomes.push({ evalCase, passed: failures.length === 0, failures, actual });
+    outcomes.push(await runCase(evalCase, options, audit));
   }
 
   return {
@@ -77,18 +78,73 @@ export async function runEval(options: RunEvalOptions): Promise<EvalRunResult> {
   };
 }
 
+async function runCase(
+  evalCase: EvalCase,
+  options: RunEvalOptions,
+  audit: MemoryAuditLogger,
+): Promise<CaseOutcome> {
+  const system = options.systems[evalCase.system];
+  if (system === undefined) {
+    return {
+      evalCase,
+      passed: false,
+      failures: [
+        `未注册的系统 "${evalCase.system}"（已注册：${Object.keys(options.systems).join(', ')}）`,
+      ],
+      actual: { kind: 'error', message: `unknown system: ${evalCase.system}` },
+    };
+  }
+
+  // 每题新建适配器与守卫：seed 写入的状态只属于本题，用例之间零串扰
+  const adapter = system.createAdapter();
+  const guard = new Guard(system.rbac, audit, {
+    ...(options.disabledLayers !== undefined ? { disabledLayers: options.disabledLayers } : {}),
+  });
+
+  for (const [index, step] of (evalCase.seed ?? []).entries()) {
+    const seeded = await invokeGuarded(guard, adapter, toPrincipal(step.principal), step);
+    if (seeded.kind !== 'ok') {
+      return {
+        evalCase,
+        passed: false,
+        failures: [
+          `seed 步骤 ${index + 1}（${step.tool}）未成功：${describeResult(seeded)}——题面铺垫失败，主断言未执行`,
+        ],
+        actual: seeded,
+      };
+    }
+  }
+
+  const actual = await invokeGuarded(guard, adapter, toPrincipal(evalCase.principal), evalCase);
+  const failures = assertCase(evalCase, actual);
+  if (options.judge !== undefined && failures.length === 0) {
+    try {
+      const verdict = await options.judge.judge(evalCase, actual);
+      if (!verdict.pass) failures.push(`LLM-judge 不通过: ${verdict.rationale}`);
+    } catch (err) {
+      // judge 打不通不能静默当通过——按失败记，保住软轨的信度
+      failures.push(`LLM-judge 调用失败: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return { evalCase, passed: failures.length === 0, failures, actual };
+}
+
+function toPrincipal(p: EvalPrincipal): Principal {
+  return {
+    userId: p.userId,
+    role: p.role,
+    ...(p.attrs !== undefined ? { attrs: p.attrs } : {}),
+  };
+}
+
 async function invokeGuarded(
   guard: Guard,
   adapter: SystemAdapter,
-  evalCase: EvalCase,
+  principal: Principal,
+  call: Pick<EvalCase, 'tool' | 'args'> | EvalSeedStep,
 ): Promise<GuardedResult> {
-  const principal: Principal = {
-    userId: evalCase.principal.userId,
-    role: evalCase.principal.role,
-    ...(evalCase.principal.attrs !== undefined ? { attrs: evalCase.principal.attrs } : {}),
-  };
   try {
-    return await guard.invoke(adapter, principal, { tool: evalCase.tool, args: evalCase.args });
+    return await guard.invoke(adapter, principal, { tool: call.tool, args: call.args });
   } catch (err) {
     // Guard 设计上不抛；万一抛了按 error 记录，保证整轮评测跑完而不是炸在半路
     return { kind: 'error', message: err instanceof Error ? err.message : String(err) };
@@ -100,7 +156,10 @@ export function assertCase(evalCase: EvalCase, actual: GuardedResult): string[] 
   const expectedKind =
     evalCase.expect === 'allow' ? 'ok' : evalCase.expect === 'refuse' ? 'refusal' : 'error';
   if (actual.kind !== expectedKind) {
-    return [`结果类型不符：期望 ${describeExpectation(evalCase)}，实际 ${describeResult(actual)}`];
+    return [
+      `结果类型不符：期望 ${describeExpectation(evalCase)}，实际 ${describeResult(actual)}`,
+      ...assertTextLeaks(evalCase, actual),
+    ];
   }
 
   const failures: string[] = [];
@@ -108,6 +167,8 @@ export function assertCase(evalCase: EvalCase, actual: GuardedResult): string[] 
   if (actual.kind !== 'ok' && 'data' in actual) {
     failures.push('拒答/错误分支携带了 data 字段——守卫出口被污染');
   }
+
+  failures.push(...assertTextLeaks(evalCase, actual));
 
   if (actual.kind === 'refusal') {
     if (
@@ -138,6 +199,28 @@ export function assertCase(evalCase: EvalCase, actual: GuardedResult): string[] 
     failures.push(...assertDataIncludes(actual.data, evalCase.expectDataIncludes));
   }
 
+  if (evalCase.mustContainText !== undefined) {
+    const serialized = JSON.stringify(actual.data);
+    for (const text of evalCase.mustContainText) {
+      if (!serialized.includes(text)) failures.push(`结果缺少期望文本："${text}"`);
+    }
+  }
+
+  return failures;
+}
+
+/**
+ * 文本级泄漏扫描：对整个结果（含拒答原因、错误消息）序列化后查禁止子串。
+ * 与 mustNotContainFields 互补——字段名扫描抓不到自由文本里内嵌的隐私值。
+ * 结果类型不符时也要扫：红队题被误放行，正是最需要知道漏了什么的时刻。
+ */
+function assertTextLeaks(evalCase: EvalCase, actual: GuardedResult): string[] {
+  if (evalCase.mustNotContainText === undefined) return [];
+  const serialized = JSON.stringify(actual);
+  const failures: string[] = [];
+  for (const text of evalCase.mustNotContainText) {
+    if (serialized.includes(text)) failures.push(`结果泄漏禁止文本："${text}"`);
+  }
   return failures;
 }
 

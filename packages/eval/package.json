@@ -9,9 +9,11 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "eval": "node --import tsx src/cli.ts"
+    "eval": "node --import tsx src/cli.ts",
+    "calibrate": "node --import tsx src/calibrate-cli.ts"
   },
   "dependencies": {
+    "@yiong/foundry-adapter-memory": "workspace:*",
     "@yiong/foundry-adapter-orangehrm": "workspace:*",
     "@yiong/foundry-core": "workspace:*",
     "yaml": "^2.7.0",

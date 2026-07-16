@@ -86,6 +86,59 @@ cases:
     ).toThrow(/expectRefusalReason/);
   });
 
+  it('system 缺省 orangehrm；seed 步骤解析并给 args 缺省 {}', () => {
+    const cases = loadCases(`
+cases:
+  - id: m1
+    title: 跨会话召回
+    system: memory
+    seed:
+      - tool: save_memory
+        args: { content: 出差靠窗, session_id: s1 }
+        principal: { userId: e002, role: employee }
+      - tool: save_memory
+        principal: { userId: e001, role: employee }
+    tool: recall_memories
+    principal: { userId: e002, role: employee }
+    expect: allow
+  - id: c1
+    title: 默认系统
+    tool: get_employee
+    principal: { userId: e002, role: employee }
+    expect: allow
+`);
+    expect(cases[0]?.system).toBe('memory');
+    expect(cases[0]?.seed).toHaveLength(2);
+    expect(cases[0]?.seed?.[1]?.args).toEqual({});
+    expect(cases[1]?.system).toBe('orangehrm');
+  });
+
+  it('mustNotContainText 任何 expect 都可用；mustContainText 仅限 allow', () => {
+    expect(() =>
+      loadCases(`
+cases:
+  - id: c1
+    title: 拒答分支也不得漏文本
+    tool: t1
+    principal: { userId: u, role: r }
+    expect: refuse
+    mustNotContainText: ["9800"]
+`),
+    ).not.toThrow();
+
+    expect(() =>
+      loadCases(`
+cases:
+  - id: c1
+    title: t
+    tool: t1
+    principal: { userId: u, role: r }
+    expect: refuse
+    mustContainText: [靠窗]
+`),
+    ).toThrow(/mustContainText/);
+  });
+
   it('expectRowCount 出现在 expect=refuse 的题里 → 抛错', () => {
     expect(() =>
       loadCases(`

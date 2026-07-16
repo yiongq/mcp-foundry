@@ -122,6 +122,73 @@ describe('守卫管线', () => {
     expect(audit.events[0]?.decision).toBe('ERROR');
   });
 
+  it('principal 透传给适配器 execute——写入类工具据此盖归属戳', async () => {
+    const seen: Principal[] = [];
+    const probe: SystemAdapter = {
+      system: 'probe',
+      tools: () => [{ name: 'echo', description: 'echo', inputSchema: z.object({}) }],
+      execute: async (_call, principal) => {
+        seen.push(principal);
+        return { data: null };
+      },
+    };
+    const guard = new Guard(rbac, new MemoryAuditLogger());
+
+    await guard.invoke(probe, LAO_LI, { tool: 'echo', args: {} });
+
+    expect(seen).toEqual([LAO_LI]);
+  });
+
+  it('ablation：关 rbac 后请求穿过白名单层，被行级过滤这道后备拦住（原因变 row_denied）', async () => {
+    const guard = new Guard(rbac, new MemoryAuditLogger(), { disabledLayers: ['rbac'] });
+
+    const result = await guard.invoke(fakeHr, XIAO_WANG, {
+      tool: 'get_salary',
+      args: { id: 'e001' },
+    });
+
+    expect(result.kind).toBe('refusal');
+    if (result.kind === 'refusal') expect(result.reason).toBe('row_denied');
+    expect(guard.allowedTools(fakeHr, { userId: 'x', role: 'ghost' })).toHaveLength(2);
+  });
+
+  it('ablation：关 row_filter 后员工能看到全员行；关 field_mask 后 salary 复现', async () => {
+    const noRows = new Guard(rbac, new MemoryAuditLogger(), { disabledLayers: ['row_filter'] });
+    const listAll = await noRows.invoke(fakeHr, XIAO_WANG, { tool: 'list_employees', args: {} });
+    expect(listAll.kind).toBe('ok');
+    if (listAll.kind === 'ok') {
+      expect(listAll.data).toHaveLength(2);
+      // 行级关了但脱敏还在
+      expect((listAll.data as Record<string, unknown>[])[0]).not.toHaveProperty('salary');
+    }
+
+    const noMask = new Guard(rbac, new MemoryAuditLogger(), { disabledLayers: ['field_mask'] });
+    const listSelf = await noMask.invoke(fakeHr, XIAO_WANG, { tool: 'list_employees', args: {} });
+    expect(listSelf.kind).toBe('ok');
+    if (listSelf.kind === 'ok') {
+      expect(listSelf.data).toHaveLength(1);
+      expect((listSelf.data as Record<string, unknown>[])[0]?.salary).toBe(9800);
+      expect(listSelf.maskedFields).toEqual([]);
+    }
+  });
+
+  it('ablation：全关 = 裸奔，未知角色也能拿到全员含薪资', async () => {
+    const guard = new Guard(rbac, new MemoryAuditLogger(), {
+      disabledLayers: ['rbac', 'row_filter', 'field_mask'],
+    });
+
+    const result = await guard.invoke(
+      fakeHr,
+      { userId: 'x', role: 'ghost' },
+      { tool: 'list_employees', args: {} },
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.data).toHaveLength(2);
+    expect((result.data as Record<string, unknown>[])[0]?.salary).toBe(18500);
+  });
+
   it('$self.attrs 引用解析失败时宁可错拒：单对象查询被拒绝', async () => {
     const strictRbac = loadRbacConfig(`
 roles:

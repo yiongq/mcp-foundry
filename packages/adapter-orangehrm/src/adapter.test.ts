@@ -6,6 +6,8 @@ import { createOrangeHrmAdapter } from './adapter.js';
 
 // env: {} 保证测试不受本机 ORANGEHRM_* 环境变量影响，始终走 fixture
 const adapter = createOrangeHrmAdapter({ env: {} });
+// 直调 execute 需要身份占位——orangehrm 适配器不读它（权限在守卫层），传谁都一样
+const CALLER: Principal = { userId: 'e000', role: 'test' };
 
 describe('fixture 模式：四个工具', () => {
   it('tools() 恰好 4 个，名称与顺序稳定', () => {
@@ -19,7 +21,7 @@ describe('fixture 模式：四个工具', () => {
   });
 
   it('list_employees 无参 → 6 人，行结构不夹带 salary/phone', async () => {
-    const { data } = await adapter.execute({ tool: 'list_employees', args: {} });
+    const { data } = await adapter.execute({ tool: 'list_employees', args: {} }, CALLER);
     expect(data).toHaveLength(6);
     const first = (data as Record<string, unknown>[])[0];
     expect(first).toEqual({
@@ -31,18 +33,27 @@ describe('fixture 模式：四个工具', () => {
   });
 
   it('list_employees dept 过滤：生产部只剩张三和李四', async () => {
-    const { data } = await adapter.execute({ tool: 'list_employees', args: { dept: '生产部' } });
+    const { data } = await adapter.execute(
+      { tool: 'list_employees', args: { dept: '生产部' } },
+      CALLER,
+    );
     const ids = (data as { employee_id: string }[]).map((r) => r.employee_id);
     expect(ids).toEqual(['e001', 'e003']);
   });
 
   it('list_employees dept 不存在 → 空数组而非报错', async () => {
-    const { data } = await adapter.execute({ tool: 'list_employees', args: { dept: '不存在部' } });
+    const { data } = await adapter.execute(
+      { tool: 'list_employees', args: { dept: '不存在部' } },
+      CALLER,
+    );
     expect(data).toEqual([]);
   });
 
   it('get_employee 命中 → 含 email/phone 的完整行', async () => {
-    const { data } = await adapter.execute({ tool: 'get_employee', args: { employee_id: 'e002' } });
+    const { data } = await adapter.execute(
+      { tool: 'get_employee', args: { employee_id: 'e002' } },
+      CALLER,
+    );
     expect(data).toEqual({
       employee_id: 'e002',
       name: '小王',
@@ -54,10 +65,13 @@ describe('fixture 模式：四个工具', () => {
   });
 
   it('get_leave_balance：annual_left = total - used', async () => {
-    const { data } = await adapter.execute({
-      tool: 'get_leave_balance',
-      args: { employee_id: 'e001' },
-    });
+    const { data } = await adapter.execute(
+      {
+        tool: 'get_leave_balance',
+        args: { employee_id: 'e001' },
+      },
+      CALLER,
+    );
     expect(data).toEqual({
       employee_id: 'e001',
       name: '张三',
@@ -68,7 +82,10 @@ describe('fixture 模式：四个工具', () => {
   });
 
   it('get_salary：金额/币种/生效日期符合 fixture 契约', async () => {
-    const { data } = await adapter.execute({ tool: 'get_salary', args: { employee_id: 'e004' } });
+    const { data } = await adapter.execute(
+      { tool: 'get_salary', args: { employee_id: 'e004' } },
+      CALLER,
+    );
     expect(data).toEqual({
       employee_id: 'e004',
       name: '老李',
@@ -80,20 +97,20 @@ describe('fixture 模式：四个工具', () => {
 
   it('不存在的 employee_id：三个单查工具都返回 null', async () => {
     for (const tool of ['get_employee', 'get_leave_balance', 'get_salary']) {
-      const { data } = await adapter.execute({ tool, args: { employee_id: 'e999' } });
+      const { data } = await adapter.execute({ tool, args: { employee_id: 'e999' } }, CALLER);
       expect(data).toBeNull();
     }
   });
 
   it('参数校验：缺 employee_id / 类型不对 → 抛错（由守卫归一为 error 分支）', async () => {
-    await expect(adapter.execute({ tool: 'get_employee', args: {} })).rejects.toThrow();
+    await expect(adapter.execute({ tool: 'get_employee', args: {} }, CALLER)).rejects.toThrow();
     await expect(
-      adapter.execute({ tool: 'get_salary', args: { employee_id: 42 } }),
+      adapter.execute({ tool: 'get_salary', args: { employee_id: 42 } }, CALLER),
     ).rejects.toThrow();
   });
 
   it('未知工具 → 抛错', async () => {
-    await expect(adapter.execute({ tool: 'fire_employee', args: {} })).rejects.toThrow();
+    await expect(adapter.execute({ tool: 'fire_employee', args: {} }, CALLER)).rejects.toThrow();
   });
 });
 
@@ -193,7 +210,7 @@ describe('REST 模式接线（mock fetch，不发真实请求）', () => {
       },
     });
 
-    const { data } = await restAdapter.execute({ tool: 'list_employees', args: {} });
+    const { data } = await restAdapter.execute({ tool: 'list_employees', args: {} }, CALLER);
     expect(data).toEqual([
       { employee_id: 'e001', name: '张三', dept: '生产部', title: '设备工程师' },
     ]);

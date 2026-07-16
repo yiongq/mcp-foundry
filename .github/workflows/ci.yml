@@ -35,7 +35,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # fixture 模式：不需要任何密钥/外部系统。
       # 脚本 cwd 是 packages/eval，--out 指回仓库根，供下面的 artifact 上传。
-      - run: pnpm --filter @yiong/foundry-eval run eval --out ../../eval-reports/report.md
+      # --repeat 3 报方差（硬断言轨应为 0）；--ablation 输出守卫逐层开/关四档对照。
+      # LLM-judge 软轨需要密钥不进 CI；校准与双轨在本地跑（见 docs/eval-methodology.md）。
+      - run: >-
+          pnpm --filter @yiong/foundry-eval run eval
+          --out ../../eval-reports/report.md --repeat 3 --ablation
       - uses: actions/upload-artifact@v4
         if: always()
         with:

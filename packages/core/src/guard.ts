@@ -2,19 +2,36 @@ import { type AuditLogger, hashArgs } from './audit.js';
 import { type RbacConfig, type RowRule, resolveSelfRef } from './rbac.js';
 import type { GuardedResult, Principal, SystemAdapter, ToolCall, ToolSpec } from './types.js';
 
+/** 守卫的三道防线，评测 ablation 按此粒度逐层关闭以量化每层贡献。 */
+export type GuardLayer = 'rbac' | 'row_filter' | 'field_mask';
+
+export interface GuardOptions {
+  /**
+   * 仅供评测 ablation（守卫开/关对照实验）使用——生产路径永远全开。
+   * 'rbac' 同时涵盖角色查找与工具白名单两个检查。
+   */
+  disabledLayers?: readonly GuardLayer[];
+}
+
 /**
  * 守卫管线，权限的唯一收口：
  *   角色查找 → 工具白名单 → 适配器执行 → 行级过滤 → 字段脱敏 → 审计
  * 任何一步失败都走结构化拒答/错误分支，且两类分支都不携带业务数据。
  */
 export class Guard {
+  private readonly disabled: ReadonlySet<GuardLayer>;
+
   constructor(
     private readonly rbac: RbacConfig,
     private readonly audit: AuditLogger,
-  ) {}
+    options: GuardOptions = {},
+  ) {
+    this.disabled = new Set(options.disabledLayers ?? []);
+  }
 
   /** tools/list 阶段就按角色收窄——不该用的工具连列表里都不出现 */
   allowedTools(adapter: SystemAdapter, principal: Principal): ToolSpec[] {
+    if (this.disabled.has('rbac')) return adapter.tools();
     const role = this.rbac.roles[principal.role];
     if (!role) return [];
     if (role.tools === '*') return adapter.tools();
@@ -44,30 +61,36 @@ export class Guard {
     };
 
     const role = this.rbac.roles[principal.role];
-    if (!role) {
-      return done({ kind: 'refusal', reason: 'unknown_role', rule: `role:${principal.role}` });
-    }
-    if (role.tools !== '*' && !role.tools.includes(call.tool)) {
-      return done({ kind: 'refusal', reason: 'tool_not_allowed', rule: `tools:${principal.role}` });
+    if (!this.disabled.has('rbac')) {
+      if (!role) {
+        return done({ kind: 'refusal', reason: 'unknown_role', rule: `role:${principal.role}` });
+      }
+      if (role.tools !== '*' && !role.tools.includes(call.tool)) {
+        return done({
+          kind: 'refusal',
+          reason: 'tool_not_allowed',
+          rule: `tools:${principal.role}`,
+        });
+      }
     }
 
     let data: unknown;
     try {
-      ({ data } = await adapter.execute(call));
+      ({ data } = await adapter.execute(call, principal));
     } catch (err) {
       return done({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
     }
 
-    const filtered = applyRowRules(data, role.rows, principal);
-    if (filtered.denied) {
-      return done({ kind: 'refusal', reason: 'row_denied', rule: filtered.rule });
+    if (!this.disabled.has('row_filter')) {
+      const filtered = applyRowRules(data, role?.rows ?? [], principal);
+      if (filtered.denied) {
+        return done({ kind: 'refusal', reason: 'row_denied', rule: filtered.rule });
+      }
+      data = filtered.data;
     }
 
-    return done({
-      kind: 'ok',
-      data: maskFields(filtered.data, role.mask),
-      maskedFields: role.mask,
-    });
+    const mask = this.disabled.has('field_mask') ? [] : (role?.mask ?? []);
+    return done({ kind: 'ok', data: maskFields(data, mask), maskedFields: mask });
   }
 }
 

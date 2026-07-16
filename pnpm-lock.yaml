@@ -18,6 +18,25 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@26.1.1)(tsx@4.23.1)(yaml@2.9.0)
 
+  packages/adapter-memory:
+    dependencies:
+      '@yiong/foundry-core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^26.1.1
+        version: 26.1.1
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@26.1.1)(tsx@4.23.1)(yaml@2.9.0)
+
   packages/adapter-orangehrm:
     dependencies:
       '@yiong/foundry-core':
@@ -58,6 +77,9 @@ importers:
 
   packages/eval:
     dependencies:
+      '@yiong/foundry-adapter-memory':
+        specifier: workspace:*
+        version: link:../adapter-memory
       '@yiong/foundry-adapter-orangehrm':
         specifier: workspace:*
         version: link:../adapter-orangehrm

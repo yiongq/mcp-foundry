@@ -105,7 +105,16 @@ cases:
     expect: allow
     expectDataIncludes: { employee_id: e004, name: 老李, salary: 22000 }
 
-  # ── 越权红队（redteam，10 题）─────────────────────────────
+  - id: n11
+    title: 列表行数据面最小化——HR 的列表行也不带 salary/phone/email
+    category: normal
+    tool: list_employees
+    principal: { userId: e004, role: hr_admin }
+    expect: allow
+    expectRowCount: 6
+    mustNotContainFields: [salary, phone, email]
+
+  # ── 越权红队（redteam，10+2 题）───────────────────────────
   - id: r01
     title: 员工查自己的薪资也不行（工具白名单收口）
     category: redteam
@@ -196,7 +205,26 @@ cases:
     expect: refuse
     expectRefusalReason: row_denied
 
-  # ── 边界（boundary，5 题）────────────────────────────────
+  - id: r11
+    title: 员工扫自己部门也只见自己一行
+    category: redteam
+    tool: list_employees
+    args: { dept: 行政部 }
+    principal: { userId: e002, role: employee }
+    expect: allow
+    expectRowCount: 1
+    mustNotContainFields: [salary, phone]
+
+  - id: r12
+    title: employee_id 大小写变造 E002——查无此人按行级错拒，不做模糊匹配
+    category: redteam
+    tool: get_employee
+    args: { employee_id: E002 }
+    principal: { userId: e002, role: employee }
+    expect: refuse
+    expectRefusalReason: row_denied
+
+  # ── 边界（boundary，5+1 题）──────────────────────────────
   - id: b01
     title: HR 查不存在的员工得 null（不报错不编造）
     category: boundary
@@ -236,3 +264,11 @@ cases:
     principal: { userId: e002, role: employee }
     expect: refuse
     expectRefusalReason: row_denied
+
+  - id: b06
+    title: dept 传空字符串 → zod min(1) 报错
+    category: boundary
+    tool: list_employees
+    args: { dept: "" }
+    principal: { userId: e004, role: hr_admin }
+    expect: error

@@ -18,12 +18,16 @@ export interface ToolCall {
   args: Record<string, unknown>;
 }
 
-/** 适配器只负责「接得通」，不做任何权限判断——权限统一收口在守卫管线。 */
+/**
+ * 适配器只负责「接得通」，不做任何权限判断——权限统一收口在守卫管线。
+ * principal 仅供写入类工具盖归属戳（如记忆的 owner 取自身份透传而非参数，
+ * 参数伪造不了归属）；适配器不得据此做放行/拒绝决策。
+ */
 export interface SystemAdapter {
   /** 系统标识，进审计日志，如 "orangehrm" */
   readonly system: string;
   tools(): ToolSpec[];
-  execute(call: ToolCall): Promise<AdapterResult>;
+  execute(call: ToolCall, principal: Principal): Promise<AdapterResult>;
 }
 
 export interface AdapterResult {
