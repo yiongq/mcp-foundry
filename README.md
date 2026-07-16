@@ -118,7 +118,7 @@ curl -s http://localhost:3100/mcp \
   -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"list_accounts","arguments":{}}}'
 ```
 
-## 签名身份（生产模式，W3）
+## 签名身份（生产模式，W3 单网关 / W5 多签发方）
 
 demo 头谁都能自称 hr_admin。设 `FOUNDRY_IDENTITY_SECRET`（≥16 字符）后服务器只认
 HS256 签名令牌，`x-foundry-*` 头被完全忽略——伪造头不是"被拒绝"，是根本不在信任路径上：
@@ -142,6 +142,28 @@ curl -s http://localhost:3100/mcp \
 过期 → 401；验签不读令牌自述的 alg，"alg: none" 一类降级攻击在结构上不成立。
 飞书入口不走这条：sender open_id 由飞书服务端签发，本身就是可信身份源。
 
+共享密钥要求签发方与验签方同持一把钥匙，适合单网关。多签发方 / 密钥轮换走
+**非对称模式（W5）**：签发方持私钥，Foundry 只见公钥集（JWKS，ES256/RS256）——
+
+```bash
+# 签发方生成密钥对（私钥 0600 落盘，公钥 JWKS 写 jwks.json）
+pnpm --filter @yiong/foundry-server run keygen --kid 2026-07
+
+# 验签方只拿公钥集；设了 FOUNDRY_IDENTITY_JWKS 即切非对称模式（HS256 令牌不再有验签路径）
+FOUNDRY_IDENTITY_JWKS=jwks.json pnpm --filter @yiong/foundry-server serve
+
+# 签发走私钥（生产由网关/SSO 持有；Foundry 永远见不到私钥）
+pnpm --filter @yiong/foundry-server run mint-token \
+  --key identity-es256.key --kid 2026-07 --user e004 --role hr_admin
+```
+
+密钥轮换是运行时动作：新 kid 的 JWK 追加进 jwks.json（mtime 热重载，无需重启），
+新旧键并存撑过渡窗口，删旧 JWK 即吊销。算法选择的纪律与 HS256 路径同一条——
+用哪种算法由**被 kid 命中的受信密钥自己的 kty** 决定（EC→ES256 / RSA→RS256），
+令牌头自述的 alg 从头到尾没人读；kid 只是受信集合内的查找提示，未命中与坏签名
+同一个 401，不给探测者区分反馈。拿公钥当 HMAC 密钥的经典混淆攻击在这里没有
+攻击面：JWKS 模式下不存在 HMAC 验签路径。
+
 签名令牌让第三方 Agent 平台零代码接入：Dify 已实测并**上了公网**（自托管 1.16）——
 同一个网关地址挂两个 MCP server、只有令牌不同，两个 Agent 应用的工具面在 Dify 界面里
 肉眼可见地不同（employee 3 个工具 / hr_admin 4 个），同问不同答、审计留痕（上面的两个
@@ -159,9 +181,11 @@ curl -s http://localhost:3100/mcp \
 - 角色不跨域：demo 身份（employee/hr_admin）不在 CRM 域的 RBAC 里，所以两个线上体验
   链接的工具面与行为**不因 CRM 域并入而改变**——线上网关是否已部署到含 CRM 的版本，
   只影响能否用 sales_* 令牌访问 CRM 工具。
-- HTTP 入口的验签是共享密钥 HS256（W3）：签发方与验签方同持一把密钥，适合单网关部署；
-  多签发方、密钥轮换要上非对称签名（JWKS），在路线图上。不设密钥时回落 demo 头模式
-  （启动时打警告），仅供本地演示与评测。
+- HTTP 入口两种生产验签：共享密钥 HS256（W3，单网关）与非对称 JWKS（W5，
+  ES256/RS256，多签发方 + 热轮换，本地端到端验证 2026-07-17）。边界：JWKS 只支持
+  本地文件（URL 拉取 + 缓存未做）；**线上实例仍跑 HS256**——单网关口径够用，且切
+  JWKS 会作废现有长效演示令牌。不设密钥时回落 demo 头模式（启动时打警告），
+  仅供本地演示与评测。
 - 飞书链路三个域都已在真实飞书应用上端到端验证（HR + 记忆 2026-07-16；CRM
   2026-07-17，网页端实测：sales_rep 查自己的单出真数、联系人电话脱敏而邮箱可见、
   越权查同事商机被 row_denied 并如实转述「已记入审计」、跨域问工资零泄漏；

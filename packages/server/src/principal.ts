@@ -1,8 +1,10 @@
 /**
- * principal 解析——两种鉴权模式，由部署方显式选择：
+ * principal 解析——三种鉴权模式，由部署方显式选择：
  *
- * - token（生产，W3）：只认 Authorization: Bearer <HS256 令牌>（见 token.ts），
+ * - token（生产·单网关，W3）：只认 Authorization: Bearer <HS256 令牌>（见 token.ts），
  *   x-foundry-* 头在此模式下被完全忽略——伪造头不是"被拒绝"，是"根本不在信任路径上"。
+ * - token-jwks（生产·多签发方，W5）：只认 Bearer <ES256/RS256 令牌>，按受信公钥集
+ *   （JWKS，支持热重载与多 kid 轮换）验签；HS256 令牌在此模式下没有验签路径。
  * - headers（demo）：直接信任 x-foundry-user / x-foundry-role 请求头，不验签，
  *   仅用于本地演示与评测脚本。
  *
@@ -10,12 +12,16 @@
  */
 import type { IncomingHttpHeaders } from 'node:http';
 import type { Principal } from '@yiong/foundry-core';
-import { verifyIdentityToken } from './token.js';
+import type { IdentityJwks } from './jwks.js';
+import { verifyIdentityToken, verifyIdentityTokenJwks } from './token.js';
 
 export const USER_HEADER = 'x-foundry-user';
 export const ROLE_HEADER = 'x-foundry-role';
 
-export type AuthConfig = { mode: 'headers' } | { mode: 'token'; secret: string };
+export type AuthConfig =
+  | { mode: 'headers' }
+  | { mode: 'token'; secret: string }
+  | { mode: 'token-jwks'; jwks: IdentityJwks | (() => IdentityJwks) };
 
 export type PrincipalVerdict = { ok: true; principal: Principal } | { ok: false; message: string };
 
@@ -57,10 +63,26 @@ export function resolvePrincipal(
   if (token === null) {
     return { ok: false, message: 'missing Authorization: Bearer <token> header' };
   }
-  const verdict =
-    now === undefined
-      ? verifyIdentityToken(auth.secret, token)
-      : verifyIdentityToken(auth.secret, token, now);
+
+  let verdict: ReturnType<typeof verifyIdentityToken>;
+  if (auth.mode === 'token') {
+    verdict =
+      now === undefined
+        ? verifyIdentityToken(auth.secret, token)
+        : verifyIdentityToken(auth.secret, token, now);
+  } else {
+    // 加载器抛错（如文件被移走且无缓存）按验签失败处理——宁可 401，不放行
+    let jwks: IdentityJwks;
+    try {
+      jwks = typeof auth.jwks === 'function' ? auth.jwks() : auth.jwks;
+    } catch {
+      return { ok: false, message: 'invalid identity token' };
+    }
+    verdict =
+      now === undefined
+        ? verifyIdentityTokenJwks(jwks, token)
+        : verifyIdentityTokenJwks(jwks, token, now);
+  }
   if (!verdict.ok) {
     return {
       ok: false,

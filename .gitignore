@@ -10,3 +10,8 @@ eval-reports/
 
 # 飞书身份绑定表：含真实 open_id，不进仓库（用 identity.feishu.example.yaml 做模板）
 config/identity.feishu.yaml
+
+# 签发方私钥（keygen 产出）：绝不进仓库、绝不上传。公钥 jwks.json 可公开、不忽略。
+# keygen 强制私钥落到 .key/.pem 扩展名，这两条通配即覆盖全部私钥产物。
+*.key
+*.pem

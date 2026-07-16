@@ -1,15 +1,28 @@
 /**
- * 身份令牌（W3 网关签名）：HS256 JWT 的最小自实现，node:crypto 零新依赖。
+ * 身份令牌：HS256（W3，单网关共享密钥）与 ES256/RS256 × JWKS（W5，多签发方/密钥轮换）
+ * 两条验签路径，node:crypto 零新依赖。
  *
- * 信任模型：网关（或管理员 CLI）持共享密钥签发 {sub, role, iat, exp}，
+ * 信任模型：签发方（网关/SSO/管理员 CLI）签发 {sub, role, iat, exp}，
  * Foundry 验签 + 验过期。签发方是身份权威——角色声明随签名一起被背书，
  * 客户端改一个字节整条令牌作废。
  *
- * 验签永远按服务端自己的 HS256 + 密钥计算，不读令牌头部自述的 alg——
- * "alg: none" 一类的算法降级攻击在结构上不成立，而非被规则挡住。
+ * 算法选择纪律（两条路径同一条）：验签用什么算法由**服务端配置**决定——
+ * HS256 路径按服务端密钥算 HMAC；JWKS 路径由**受信密钥集中被 kid 命中的那把键
+ * 自己的 kty** 决定（EC→ES256 / RSA→RS256）。令牌头部自述的 alg 从头到尾没人读，
+ * "alg: none"、HS256/RS256 混淆一类的算法降级攻击在结构上不成立，而非被规则挡住。
+ * kid 只是受信集合内的查找提示：查不到、格式不对都进 bad_signature 一个桶，
+ * 不给探测者区分反馈。
  */
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  createHmac,
+  createPrivateKey,
+  createPublicKey,
+  sign as cryptoSign,
+  verify as cryptoVerify,
+  timingSafeEqual,
+} from 'node:crypto';
 import type { Principal } from '@yiong/foundry-core';
+import type { IdentityJwks } from './jwks.js';
 
 export interface IdentityClaims {
   sub: string;
@@ -26,7 +39,7 @@ const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
 const b64url = (data: string | Buffer): string => Buffer.from(data).toString('base64url');
 
-const sign = (secret: string, signingInput: string): Buffer =>
+const hmac = (secret: string, signingInput: string): Buffer =>
   createHmac('sha256', secret).update(signingInput).digest();
 
 function assertSecret(secret: string): void {
@@ -35,44 +48,20 @@ function assertSecret(secret: string): void {
   }
 }
 
-export function mintIdentityToken(
-  secret: string,
-  principal: Principal,
-  ttlSeconds: number,
-  issuedAt = nowSeconds(),
-): string {
-  assertSecret(secret);
+function buildClaims(principal: Principal, ttlSeconds: number, issuedAt: number): IdentityClaims {
   if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
     throw new Error('ttlSeconds must be a positive number');
   }
-  const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const claims: IdentityClaims = {
+  return {
     sub: principal.userId,
     role: principal.role,
     iat: issuedAt,
     exp: issuedAt + ttlSeconds,
   };
-  const signingInput = `${header}.${b64url(JSON.stringify(claims))}`;
-  return `${signingInput}.${b64url(sign(secret, signingInput))}`;
 }
 
-/** 先验签后解析：签名不过的字节一律不进 JSON.parse，payload 不成为解析攻击面。 */
-export function verifyIdentityToken(
-  secret: string,
-  token: string,
-  now = nowSeconds(),
-): TokenVerdict {
-  assertSecret(secret);
-  const parts = token.split('.');
-  if (parts.length !== 3 || parts.some((p) => p === '')) return { ok: false, reason: 'malformed' };
-  const [header, payload, signature] = parts as [string, string, string];
-
-  const expected = sign(secret, `${header}.${payload}`);
-  const actual = Buffer.from(signature, 'base64url');
-  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
-    return { ok: false, reason: 'bad_signature' };
-  }
-
+/** 签名通过之后才解析 payload；三段式/空段在调用方已挡掉。 */
+function parseVerifiedClaims(payload: string, now: number): TokenVerdict {
   let claims: Partial<IdentityClaims>;
   try {
     claims = JSON.parse(
@@ -93,4 +82,113 @@ export function verifyIdentityToken(
   if ((claims.exp as number) <= now) return { ok: false, reason: 'expired' };
 
   return { ok: true, principal: { userId: claims.sub, role: claims.role } };
+}
+
+function splitToken(token: string): [string, string, string] | null {
+  const parts = token.split('.');
+  if (parts.length !== 3 || parts.some((p) => p === '')) return null;
+  return parts as [string, string, string];
+}
+
+export function mintIdentityToken(
+  secret: string,
+  principal: Principal,
+  ttlSeconds: number,
+  issuedAt = nowSeconds(),
+): string {
+  assertSecret(secret);
+  const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const claims = buildClaims(principal, ttlSeconds, issuedAt);
+  const signingInput = `${header}.${b64url(JSON.stringify(claims))}`;
+  return `${signingInput}.${b64url(hmac(secret, signingInput))}`;
+}
+
+/** 先验签后解析：签名不过的字节一律不进 JSON.parse，payload 不成为解析攻击面。 */
+export function verifyIdentityToken(
+  secret: string,
+  token: string,
+  now = nowSeconds(),
+): TokenVerdict {
+  assertSecret(secret);
+  const parts = splitToken(token);
+  if (parts === null) return { ok: false, reason: 'malformed' };
+  const [header, payload, signature] = parts;
+
+  const expected = hmac(secret, `${header}.${payload}`);
+  const actual = Buffer.from(signature, 'base64url');
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    return { ok: false, reason: 'bad_signature' };
+  }
+
+  return parseVerifiedClaims(payload, now);
+}
+
+/**
+ * ES256 签发（P-256 EC 私钥，PEM）。演示里由 keygen + mint-token CLI 扮演
+ * "独立签发方"；生产由网关/SSO 持私钥签发，Foundry 只见公钥 JWKS。
+ * JWT 的 ES256 签名是裸 R||S（ieee-p1363），不是 ASN.1/DER——两边都要钉住。
+ */
+export function mintIdentityTokenEs256(
+  privateKeyPem: string,
+  kid: string,
+  principal: Principal,
+  ttlSeconds: number,
+  issuedAt = nowSeconds(),
+): string {
+  if (kid === '') throw new Error('kid must be non-empty');
+  const key = createPrivateKey(privateKeyPem);
+  if (key.asymmetricKeyType !== 'ec') {
+    throw new Error('ES256 signing requires an EC (P-256) private key');
+  }
+  const header = b64url(JSON.stringify({ alg: 'ES256', typ: 'JWT', kid }));
+  const claims = buildClaims(principal, ttlSeconds, issuedAt);
+  const signingInput = `${header}.${b64url(JSON.stringify(claims))}`;
+  const signature = cryptoSign('sha256', Buffer.from(signingInput), {
+    key,
+    dsaEncoding: 'ieee-p1363',
+  });
+  return `${signingInput}.${b64url(signature)}`;
+}
+
+/**
+ * JWKS 验签：头部只取 kid 当受信密钥集的查找键（这是验签前唯一解析的字段，
+ * 也决定不了任何密码学参数）；命中键的 kty 决定验签算法。payload 仍是
+ * 先验签后解析。kid 缺失/未命中/公钥导入失败统一 bad_signature——
+ * 对外与坏签名不可区分。
+ */
+export function verifyIdentityTokenJwks(
+  jwks: IdentityJwks,
+  token: string,
+  now = nowSeconds(),
+): TokenVerdict {
+  const parts = splitToken(token);
+  if (parts === null) return { ok: false, reason: 'malformed' };
+  const [header, payload, signature] = parts;
+
+  let kid: unknown;
+  try {
+    kid = (JSON.parse(Buffer.from(header, 'base64url').toString('utf8')) as { kid?: unknown }).kid;
+  } catch {
+    return { ok: false, reason: 'malformed' };
+  }
+  if (typeof kid !== 'string' || kid === '') return { ok: false, reason: 'bad_signature' };
+
+  const jwk = jwks.keys.find((k) => k.kid === kid);
+  if (jwk === undefined) return { ok: false, reason: 'bad_signature' };
+
+  let valid: boolean;
+  try {
+    const key = createPublicKey({ key: jwk, format: 'jwk' });
+    const signingInput = Buffer.from(`${header}.${payload}`);
+    const sig = Buffer.from(signature, 'base64url');
+    valid =
+      jwk.kty === 'EC'
+        ? cryptoVerify('sha256', signingInput, { key, dsaEncoding: 'ieee-p1363' }, sig)
+        : cryptoVerify('sha256', signingInput, key, sig);
+  } catch {
+    return { ok: false, reason: 'bad_signature' };
+  }
+  if (!valid) return { ok: false, reason: 'bad_signature' };
+
+  return parseVerifiedClaims(payload, now);
 }
