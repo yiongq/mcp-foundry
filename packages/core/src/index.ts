@@ -1,0 +1,14 @@
+export type {
+  AdapterResult,
+  GuardedResult,
+  Principal,
+  RefusalReason,
+  SystemAdapter,
+  ToolCall,
+  ToolSpec,
+} from './types.js';
+export { loadRbacConfig, resolveSelfRef } from './rbac.js';
+export type { RbacConfig, RoleRule, RowRule } from './rbac.js';
+export { Guard, maskFields } from './guard.js';
+export { hashArgs, JsonlAuditLogger, MemoryAuditLogger } from './audit.js';
+export type { AuditEvent, AuditLogger } from './audit.js';

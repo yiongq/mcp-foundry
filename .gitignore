@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.env
+.env.*
+audit/*.jsonl
+eval-reports/
+.DS_Store
