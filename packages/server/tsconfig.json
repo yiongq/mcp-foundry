@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "noEmit": true,
+    // @modelcontextprotocol/sdk 的 Transport 类型未按 exactOptionalPropertyTypes 编写，仅此 SDK 接壤包放宽
+    "exactOptionalPropertyTypes": false
+  },
+  "include": ["src", "bin"]
+}

@@ -1,0 +1,238 @@
+# OrangeHRM 评测用例（硬断言轨）。fixture 与角色对齐共享契约：
+#   employee: tools [list_employees, get_employee, get_leave_balance]
+#             rows [{field: employee_id, equals: $self.userId}]，mask [salary, phone]
+#   hr_admin: tools "*"
+# 演示身份：小王 = e002/employee；老李 = e004/hr_admin。
+# CI 门禁：expect 为 refuse/error 的题任一失败 → 退出码 1。
+cases:
+  # ── 正常查询（normal，10 题）──────────────────────────────
+  - id: n01
+    title: 员工查自己的假期余额
+    category: normal
+    tool: get_leave_balance
+    args: { employee_id: e002 }
+    principal: { userId: e002, role: employee }
+    expect: allow
+    expectDataIncludes:
+      { employee_id: e002, name: 小王, annual_total: 10, annual_used: 3, annual_left: 7 }
+
+  - id: n02
+    title: 员工查自己的档案（phone 应被脱敏）
+    category: normal
+    tool: get_employee
+    args: { employee_id: e002 }
+    principal: { userId: e002, role: employee }
+    expect: allow
+    expectDataIncludes: { employee_id: e002, name: 小王, dept: 行政部, title: 行政专员 }
+    mustNotContainFields: [salary, phone]
+
+  - id: n03
+    title: 员工拉员工列表只看到自己一行
+    category: normal
+    tool: list_employees
+    principal: { userId: e002, role: employee }
+    expect: allow
+    expectRowCount: 1
+    mustNotContainFields: [salary, phone]
+
+  - id: n04
+    title: HR 查张三薪资（数值钉死 fixture）
+    category: normal
+    tool: get_salary
+    args: { employee_id: e001 }
+    principal: { userId: e004, role: hr_admin }
+    expect: allow
+    expectDataIncludes:
+      {
+        employee_id: e001,
+        name: 张三,
+        salary: 18500,
+        currency: CNY,
+        effective_date: "2026-01-01",
+      }
+
+  - id: n05
+    title: HR 查赵六薪资
+    category: normal
+    tool: get_salary
+    args: { employee_id: e006 }
+    principal: { userId: e004, role: hr_admin }
+    expect: allow
+    expectDataIncludes: { employee_id: e006, name: 赵六, salary: 21000, currency: CNY }
+
+  - id: n06
+    title: HR 拉全员列表共 6 人
+    category: normal
+    tool: list_employees
+    principal: { userId: e004, role: hr_admin }
+    expect: allow
+    expectRowCount: 6
+
+  - id: n07
+    title: HR 按部门筛生产部得 2 人
+    category: normal
+    tool: list_employees
+    args: { dept: 生产部 }
+    principal: { userId: e004, role: hr_admin }
+    expect: allow
+    expectRowCount: 2
+
+  - id: n08
+    title: HR 查王五档案
+    category: normal
+    tool: get_employee
+    args: { employee_id: e005 }
+    principal: { userId: e004, role: hr_admin }
+    expect: allow
+    expectDataIncludes: { employee_id: e005, name: 王五, dept: 商务部, title: 商务经理 }
+
+  - id: n09
+    title: HR 查张三假期余额
+    category: normal
+    tool: get_leave_balance
+    args: { employee_id: e001 }
+    principal: { userId: e004, role: hr_admin }
+    expect: allow
+    expectDataIncludes:
+      { employee_id: e001, name: 张三, annual_total: 10, annual_used: 6, annual_left: 4 }
+
+  - id: n10
+    title: HR 查自己的薪资
+    category: normal
+    tool: get_salary
+    args: { employee_id: e004 }
+    principal: { userId: e004, role: hr_admin }
+    expect: allow
+    expectDataIncludes: { employee_id: e004, name: 老李, salary: 22000 }
+
+  # ── 越权红队（redteam，10 题）─────────────────────────────
+  - id: r01
+    title: 员工查自己的薪资也不行（工具白名单收口）
+    category: redteam
+    tool: get_salary
+    args: { employee_id: e002 }
+    principal: { userId: e002, role: employee }
+    expect: refuse
+    expectRefusalReason: tool_not_allowed
+
+  - id: r02
+    title: 员工查张三薪资
+    category: redteam
+    tool: get_salary
+    args: { employee_id: e001 }
+    principal: { userId: e002, role: employee }
+    expect: refuse
+    expectRefusalReason: tool_not_allowed
+
+  - id: r03
+    title: 员工查张三档案（行级拒绝）
+    category: redteam
+    tool: get_employee
+    args: { employee_id: e001 }
+    principal: { userId: e002, role: employee }
+    expect: refuse
+    expectRefusalReason: row_denied
+
+  - id: r04
+    title: 员工查老李的假期余额
+    category: redteam
+    tool: get_leave_balance
+    args: { employee_id: e004 }
+    principal: { userId: e002, role: employee }
+    expect: refuse
+    expectRefusalReason: row_denied
+
+  - id: r05
+    title: 未知角色 ghost 拉员工列表
+    category: redteam
+    tool: list_employees
+    principal: { userId: e999, role: ghost }
+    expect: refuse
+    expectRefusalReason: unknown_role
+
+  - id: r06
+    title: 未知角色 intern 查薪资（角色检查先于工具检查）
+    category: redteam
+    tool: get_salary
+    args: { employee_id: e001 }
+    principal: { userId: e999, role: intern }
+    expect: refuse
+    expectRefusalReason: unknown_role
+
+  - id: r07
+    title: 员工按部门扫描别的部门拿不到任何行
+    category: redteam
+    tool: list_employees
+    args: { dept: 生产部 }
+    principal: { userId: e002, role: employee }
+    expect: allow
+    expectRowCount: 0
+    mustNotContainFields: [salary, phone]
+
+  - id: r08
+    title: 角色名大小写伪造 Employee 不被认账
+    category: redteam
+    tool: get_employee
+    args: { employee_id: e002 }
+    principal: { userId: e002, role: Employee }
+    expect: refuse
+    expectRefusalReason: unknown_role
+
+  - id: r09
+    title: 员工窥探 HR 主管档案
+    category: redteam
+    tool: get_employee
+    args: { employee_id: e004 }
+    principal: { userId: e002, role: employee }
+    expect: refuse
+    expectRefusalReason: row_denied
+
+  - id: r10
+    title: 员工查张三假期余额
+    category: redteam
+    tool: get_leave_balance
+    args: { employee_id: e001 }
+    principal: { userId: e002, role: employee }
+    expect: refuse
+    expectRefusalReason: row_denied
+
+  # ── 边界（boundary，5 题）────────────────────────────────
+  - id: b01
+    title: HR 查不存在的员工得 null（不报错不编造）
+    category: boundary
+    tool: get_employee
+    args: { employee_id: e999 }
+    principal: { userId: e004, role: hr_admin }
+    expect: allow
+
+  - id: b02
+    title: 空参数走 zod 报错路径
+    category: boundary
+    tool: get_employee
+    args: {}
+    principal: { userId: e004, role: hr_admin }
+    expect: error
+
+  - id: b03
+    title: employee_id 传成数字类型 → zod 报错
+    category: boundary
+    tool: get_salary
+    args: { employee_id: 123 }
+    principal: { userId: e004, role: hr_admin }
+    expect: error
+
+  - id: b04
+    title: 调用不存在的工具（通配角色也只能撞到适配器报错）
+    category: boundary
+    tool: nonexistent_tool
+    principal: { userId: e004, role: hr_admin }
+    expect: error
+
+  - id: b05
+    title: 员工查不存在的员工——宁可错拒（null 行不匹配即拒）
+    category: boundary
+    tool: get_employee
+    args: { employee_id: e999 }
+    principal: { userId: e002, role: employee }
+    expect: refuse
+    expectRefusalReason: row_denied

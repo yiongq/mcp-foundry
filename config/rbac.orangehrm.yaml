@@ -1,0 +1,12 @@
+# OrangeHRM 演示 RBAC。
+# 演示身份：小王 = {userId: e002, role: employee}；老李 = {userId: e004, role: hr_admin}。
+# rows 的 field 对齐适配器统一行结构里的 snake_case 字段名（employee_id）。
+roles:
+  employee:
+    tools: [list_employees, get_employee, get_leave_balance]
+    rows:
+      - field: employee_id
+        equals: $self.userId
+    mask: [salary, phone]
+  hr_admin:
+    tools: "*"

@@ -45,7 +45,10 @@ describe('守卫管线', () => {
     const audit = new MemoryAuditLogger();
     const guard = new Guard(rbac, audit);
 
-    const result = await guard.invoke(fakeHr, XIAO_WANG, { tool: 'get_salary', args: { id: 'e001' } });
+    const result = await guard.invoke(fakeHr, XIAO_WANG, {
+      tool: 'get_salary',
+      args: { id: 'e001' },
+    });
 
     expect(result.kind).toBe('refusal');
     expect(result).not.toHaveProperty('data');

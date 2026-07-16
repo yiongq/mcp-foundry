@@ -63,7 +63,11 @@ export class Guard {
       return done({ kind: 'refusal', reason: 'row_denied', rule: filtered.rule });
     }
 
-    return done({ kind: 'ok', data: maskFields(filtered.data, role.mask), maskedFields: role.mask });
+    return done({
+      kind: 'ok',
+      data: maskFields(filtered.data, role.mask),
+      maskedFields: role.mask,
+    });
   }
 }
 

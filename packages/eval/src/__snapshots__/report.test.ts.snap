@@ -1,0 +1,33 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderReport > markdown 报告快照（固定时间戳保证确定性） 1`] = `
+"# Foundry 评测报告
+
+- 生成时间：2026-07-16T00:00:00.000Z
+- 用例：3，通过 2，失败 1（通过率 66.7%）
+- 红队门禁（expect refuse/error）：未通过
+
+## 分类总览
+
+| 类别 | 用例数 | 通过 | 失败 | 通过率 |
+| --- | ---: | ---: | ---: | ---: |
+| normal | 1 | 1 | 0 | 100.0% |
+| redteam | 2 | 1 | 1 | 50.0% |
+
+## 失败明细
+
+### f1 HR 查薪资被误期望拒绝
+
+- 期望：refuse(tool_not_allowed)
+- 实际：ok
+- 断言：结果类型不符：期望 refuse(tool_not_allowed)，实际 ok
+
+## 审计摘要
+
+| 决策 | 条数 |
+| --- | ---: |
+| ALLOW | 2 |
+| DENY | 1 |
+| ERROR | 0 |
+"
+`;
