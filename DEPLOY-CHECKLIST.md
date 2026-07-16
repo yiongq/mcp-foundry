@@ -18,11 +18,21 @@ dify.yiongspace.com    ──► Caddy :443 ──► 127.0.0.1:8093  Dify nginx
 - [ ] VPS 已有 Docker + Caddy（跑着 ai-edge / trpg 即已具备）
 - [ ] 内存余量 ≥ 4GB（Dify 自托管 14 个容器，约占 3–4GB；`free -h` 看 available）
 
-## 1. 拉代码
+## 1. 上传代码
+
+仓库是私有的、服务器上没有 GitHub 凭据（ai-edge 当初也是拷上去的，`/opt/ai-edge`
+里没有 `.git`）。从**本机**推：
 
 ```bash
-cd /opt && git clone git@github.com:yiongq/mcp-foundry.git && cd mcp-foundry
+rsync -az --delete \
+  --exclude node_modules --exclude .git --exclude .env \
+  --exclude 'audit/*.jsonl' --exclude eval-reports \
+  --exclude config/identity.feishu.yaml \
+  ./ root@<VPS_IP>:/opt/mcp-foundry/
 ```
+
+排除项里 `.env` 与 `identity.feishu.yaml` 是硬要求——它们含密钥/真实 open_id，
+绝不上传（服务器上的 `.env` 由下一步现场生成）。
 
 ## 2. 生产密钥（唯一要动脑的一步）
 
@@ -91,13 +101,27 @@ docker compose exec -e FOUNDRY_IDENTITY_SECRET="$FOUNDRY_IDENTITY_SECRET" foundr
 cd /opt && git clone --depth 1 https://github.com/langgenius/dify.git && cd dify/docker
 cp .env.example .env
 sed -i "s|^EXPOSE_NGINX_PORT=.*|EXPOSE_NGINX_PORT=8093|" .env
+sed -i "s|^EXPOSE_NGINX_SSL_PORT=.*|EXPOSE_NGINX_SSL_PORT=8443|" .env   # 默认 443 会撞 Caddy
 sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$(openssl rand -base64 42)|" .env
 sed -i "s|^CONSOLE_API_URL=.*|CONSOLE_API_URL=https://dify.yiongspace.com|" .env
 sed -i "s|^CONSOLE_WEB_URL=.*|CONSOLE_WEB_URL=https://dify.yiongspace.com|" .env
 sed -i "s|^SERVICE_API_URL=.*|SERVICE_API_URL=https://dify.yiongspace.com|" .env
 sed -i "s|^APP_API_URL=.*|APP_API_URL=https://dify.yiongspace.com|" .env
 sed -i "s|^APP_WEB_URL=.*|APP_WEB_URL=https://dify.yiongspace.com|" .env
-docker compose up -d      # 首次拉 ~10GB 镜像
+```
+
+Dify 的 nginx 默认把端口发布到 `0.0.0.0`——等于在公网裸奔一个 HTTP 控制台、
+绕过 Caddy 的 HTTPS。加 override 收到 loopback（与 foundry 同一姿态）：
+
+```bash
+cat > docker-compose.override.yml <<'EOF'
+services:
+  nginx:
+    ports: !override
+      - "127.0.0.1:8093:80"
+EOF
+docker compose config | grep -A2 'target: 80'   # 应见 host_ip: 127.0.0.1
+docker compose up -d                            # 首次拉 ~10GB 镜像，耐心等
 ```
 
 foundry 走公网域名接入，**不需要** `SSRF_PROXY_ALLOW_PRIVATE_DOMAINS`
@@ -113,7 +137,20 @@ foundry 走公网域名接入，**不需要** `SSRF_PROXY_ALLOW_PRIVATE_DOMAINS`
   第二个加 `?as=hr_admin` 绕开 Dify 的 URL 查重），header 各填对应长效令牌
 - 建两个 Agent 应用，验收：employee 3 工具 / hr_admin 4 工具，同问不同答
 
-## 9. 收尾
+## 9. 端口暴露复核（别信 compose 写了什么，去打一下）
+
+```bash
+# 从本机（不是服务器上）打裸端口——必须连不上
+curl -m 8 --noproxy '*' http://<VPS_IP>:3100/healthz    # 期望：连接失败
+curl -m 8 --noproxy '*' http://<VPS_IP>:8093/           # 期望：连接失败
+curl -m 8 --noproxy '*' https://foundry.yiongspace.com/healthz   # 期望：200
+```
+
+`--noproxy '*'` 不能省：本机若挂着代理，代理连不上源站会回 **502**，看起来
+像"服务器拒绝了"，其实什么都没验到（这个假阳性实测踩过）。服务器侧对照：
+`ss -tlnp | grep -E ':3100|:8093'` 应当只见 `127.0.0.1:`，不能有 `0.0.0.0:`。
+
+## 10. 收尾
 
 - [ ] README 诚实边界更新：公网演示地址、令牌到期口径
 - [ ] 审计卷备份策略（`foundry-audit` 卷，可选）
