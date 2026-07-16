@@ -3,6 +3,7 @@ dist/
 *.log
 .env
 .env.*
+!.env.production.example
 audit/*.jsonl
 eval-reports/
 .DS_Store

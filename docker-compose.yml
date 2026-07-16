@@ -1,0 +1,27 @@
+# ── foundry 公网栈（模式照搬 ai-edge：只绑 loopback，Caddy 在最前）──────────
+#   cp .env.production.example .env    # 填 FOUNDRY_IDENTITY_SECRET（服务器侧，绝不 commit）
+#   docker compose up --build -d
+#   BASE=http://127.0.0.1:3100 bash smoke.sh
+#
+# 端口只发布到 127.0.0.1——公网流量必须经 Caddy（HTTPS + 域名）进来：
+#   foundry.yiongspace.com { reverse_proxy 127.0.0.1:3100 }
+
+name: mcp-foundry
+
+services:
+  foundry-server:
+    build: .
+    image: mcp-foundry-server
+    environment:
+      PORT: "3100"
+      # 生产铁律：必须设密钥（token 模式）。缺失时服务会以 demo 头模式启动
+      # ——smoke.sh 的"伪造头必须 401"探针会当场揪出这种错误部署。
+      FOUNDRY_IDENTITY_SECRET: "${FOUNDRY_IDENTITY_SECRET:?set in .env — never commit}"
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - "foundry-audit:/app/audit"
+    restart: unless-stopped
+
+volumes:
+  foundry-audit:

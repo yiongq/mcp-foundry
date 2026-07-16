@@ -1,0 +1,120 @@
+# 上线操作清单（VPS · 逐条照敲）
+
+> 拓扑与 ai-edge 同构：**服务只绑 loopback，Caddy 在最前做 HTTPS**。
+> foundry 比 ai-edge 简单得多——单进程、无模型下载、无 submodule。
+> 占位符：`foundry.yiongspace.com` = 网关域名；`dify.yiongspace.com` = Dify 控制台。
+
+```
+浏览器 / Dify / 任意 MCP host
+   │  https
+   ▼
+foundry.yiongspace.com ──► Caddy :443 ──► 127.0.0.1:3100  foundry-server（token 模式）
+dify.yiongspace.com    ──► Caddy :443 ──► 127.0.0.1:8093  Dify nginx（自托管入口层）
+```
+
+## 0. 前置
+
+- [ ] DNS：`foundry` 与 `dify` 两条 A 记录 → VPS 公网 IP（与 `api`/`trpg` 同 IP）
+- [ ] VPS 已有 Docker + Caddy（跑着 ai-edge / trpg 即已具备）
+- [ ] 内存余量 ≥ 4GB（Dify 自托管 14 个容器，约占 3–4GB；`free -h` 看 available）
+
+## 1. 拉代码
+
+```bash
+cd /opt && git clone git@github.com:yiongq/mcp-foundry.git && cd mcp-foundry
+```
+
+## 2. 生产密钥（唯一要动脑的一步）
+
+```bash
+cp .env.production.example .env
+sed -i "s|^FOUNDRY_IDENTITY_SECRET=.*|FOUNDRY_IDENTITY_SECRET=$(openssl rand -base64 42)|" .env
+```
+
+`.env` 只存在于服务器（已被 .gitignore 忽略）。**生产密钥必须与本地演示密钥不同**；
+公网上跑 demo 头模式等于裸奔——第 4 步的冒烟会当场揪出这种错误部署。
+
+## 3. 起服务（无模型下载，秒级）
+
+```bash
+docker compose up --build -d
+docker compose logs foundry-server | tail -3   # 应见 "identity: signed token"
+```
+
+若日志出现 `identity: DEMO trust headers … unsigned, anyone can claim any role`
+→ 密钥没注进去，**立刻停下排查**，别接 Caddy。
+
+## 4. 冒烟（先本机，再公网）
+
+```bash
+set -a; . ./.env; set +a
+BASE=http://127.0.0.1:3100 bash smoke.sh
+```
+
+五针全绿才继续：healthz 200 / 伪造头 401 / employee 3 工具无 get_salary /
+hr_admin 4 工具含 get_salary / 篡改签名 401。
+
+## 5. Caddy（两个站点，各两行）
+
+```bash
+cat >>/etc/caddy/Caddyfile <<'EOF'
+
+foundry.yiongspace.com {
+    reverse_proxy 127.0.0.1:3100
+}
+
+dify.yiongspace.com {
+    reverse_proxy 127.0.0.1:8093
+}
+EOF
+systemctl reload caddy
+BASE=https://foundry.yiongspace.com bash smoke.sh   # 公网版，仍需五针全绿
+```
+
+Caddy 自动签发/续期证书。
+
+## 6. 签发长效演示令牌
+
+```bash
+docker compose exec -e FOUNDRY_IDENTITY_SECRET="$FOUNDRY_IDENTITY_SECRET" foundry-server \
+  pnpm --filter @yiong/foundry-server run mint-token --user e002 --role employee --ttl 31536000
+docker compose exec -e FOUNDRY_IDENTITY_SECRET="$FOUNDRY_IDENTITY_SECRET" foundry-server \
+  pnpm --filter @yiong/foundry-server run mint-token --user e004 --role hr_admin --ttl 31536000
+```
+
+演示令牌给足 TTL（一年），否则某天 demo 会静默失效。到期用同样命令重签、
+在 Dify 的 MCP server 编辑页更新 header。
+
+## 7. Dify 自托管
+
+```bash
+cd /opt && git clone --depth 1 https://github.com/langgenius/dify.git && cd dify/docker
+cp .env.example .env
+sed -i "s|^EXPOSE_NGINX_PORT=.*|EXPOSE_NGINX_PORT=8093|" .env
+sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$(openssl rand -base64 42)|" .env
+sed -i "s|^CONSOLE_API_URL=.*|CONSOLE_API_URL=https://dify.yiongspace.com|" .env
+sed -i "s|^CONSOLE_WEB_URL=.*|CONSOLE_WEB_URL=https://dify.yiongspace.com|" .env
+sed -i "s|^SERVICE_API_URL=.*|SERVICE_API_URL=https://dify.yiongspace.com|" .env
+sed -i "s|^APP_API_URL=.*|APP_API_URL=https://dify.yiongspace.com|" .env
+sed -i "s|^APP_WEB_URL=.*|APP_WEB_URL=https://dify.yiongspace.com|" .env
+docker compose up -d      # 首次拉 ~10GB 镜像
+```
+
+foundry 走公网域名接入，**不需要** `SSRF_PROXY_ALLOW_PRIVATE_DOMAINS`
+（那条只在 Dify 直连宿主机私网地址时才需要，见 [docs/dify-integration.md](docs/dify-integration.md)）。
+
+## 8. 配置 Dify
+
+浏览器开 `https://dify.yiongspace.com/install` 建管理员，然后照
+[docs/dify-integration.md](docs/dify-integration.md) 步骤 3–4：
+
+- 装 ZHIPU AI 模型插件、填 GLM key
+- 加两个 MCP server（URL 都是 `https://foundry.yiongspace.com/mcp`，
+  第二个加 `?as=hr_admin` 绕开 Dify 的 URL 查重），header 各填对应长效令牌
+- 建两个 Agent 应用，验收：employee 3 工具 / hr_admin 4 工具，同问不同答
+
+## 9. 收尾
+
+- [ ] README 诚实边界更新：公网演示地址、令牌到期口径
+- [ ] 审计卷备份策略（`foundry-audit` 卷，可选）
+- [ ] 演示数据仍是 6 人 fixture——对外说明这是演示口径，非生产数字
