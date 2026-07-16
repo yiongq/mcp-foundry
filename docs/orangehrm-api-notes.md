@@ -1,8 +1,20 @@
 # OrangeHRM 5.x API 对接笔记（adapter-orangehrm REST 模式）
 
-状态：**全部未经真机实测**。以下按置信度分级：`高`＝多方公开资料一致；`中`＝有资料佐证但版本差异大；`待实测`＝凭对 v2 API 的一般了解写的最佳猜测。改 `packages/adapter-orangehrm/src/rest.ts` 的映射前先更新本笔记。
+状态：**核心认证问题已真机源码实测（2026-07-16，镜像 orangehrm/orangehrm:5.7）**，其余端点/字段仍按置信度分级待实测。改 `packages/adapter-orangehrm/src/rest.ts` 前先看下面的结论。
 
-自测入口：起 `docker/orangehrm` 环境后，OrangeHRM 自带 Swagger 文档页（管理后台可开），逐条核对下表即可清掉「待实测」。
+## ⚠️ 结论：client_credentials 不可用 → REST 模式改走「只读直连 MySQL」
+
+源码实测 `src/plugins/orangehrmCoreOAuthPlugin/Server/OAuthServer.php`：只 `enableGrantType()` 了 **AuthCodeGrant + RefreshTokenGrant**，没有 ClientCredentialsGrant（`league/oauth2-server` vendor 里有这个类，但 OrangeHRM 没接线）；OAuth 插件的 entity 也只有 authorization_code / refresh_token 两种。
+
+含义：**无人值守的 server-to-server 认证走不通**。authorization_code 需要人在浏览器登录授权，不适合后端 MCP 适配器常驻调用。
+
+采用的替代方案（W-later 实现，不阻塞 W1）：REST 模式退化为 **只读直连 OrangeHRM 的 MySQL**（`hs_hr_employee` 等表），正好把 ai-edge 的 NL2SQL 四层守卫（词法掩码 / LIMIT 钳制 / stmt.readonly 断言 / 连接级只读）用上——坏消息变成多一层可演示的工程。fixture 模式仍是 W1~演示主路径，不受影响。
+
+待验证：真实 DB schema（表名/字段名/工号列），需走完安装向导后 `docker exec ... mysql` dump 一次 `hs_hr_employee`。HTTP 版 authorization_code 半自动换票作为次要备选保留。
+
+---
+
+自测入口：起 `docker/orangehrm` 环境后，OrangeHRM 自带 Swagger 文档页（管理后台可开），逐条核对下表即可清掉「待实测」。下表的 OAuth token 部分已被上面的结论取代。
 
 ## 认证
 
@@ -50,8 +62,7 @@
 
 ## 待实测清单（按优先级）
 
-1. client_credentials 是否可用（不可用则整个 REST 模式的自动化前提要换方案）
-2. leave 余额端点路径与响应字段（annual_used 直接影响演示答案）
-3. `model=detailed` 参数是否存在
-4. currencyType.id 的取值格式
-5. 中文姓名的拼接顺序
+1. ~~client_credentials 是否可用~~ ✅ 已实测：**不支持**，REST 模式改走只读 MySQL（见顶部结论）
+2. 真实 DB schema：`hs_hr_employee` 及关联表的字段名/工号列（MySQL 兜底适配器依赖）
+3. leave 余额、salary 在 DB 里的表与口径（走 SQL 后端点笔记作废，改看表）
+4. 中文姓名的拼接顺序（DB 里 emp_firstname/emp_lastname 分列）

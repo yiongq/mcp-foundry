@@ -25,7 +25,9 @@ services:
       mysql:
         condition: service_healthy
     ports:
-      - "8080:80"
+      # 显式绑 127.0.0.1:8071——8080/8090 会被 ai-edge 网关的 dual-stack 监听盖住，
+      # 且演示环境不必对外暴露
+      - "127.0.0.1:8071:80"
     volumes:
       # 整个 web 目录进卷：安装向导写入的 DB 配置（lib/confs/Conf.php）才能跨容器重建保留。
       # 代价是镜像升级不会自动生效——演示环境接受这个取舍。

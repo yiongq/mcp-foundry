@@ -8,7 +8,7 @@ REST 模式联调用的真实 OrangeHRM Starter 5.x。W1 演示与 CI 默认走 
 cd docker/orangehrm
 docker compose up -d
 # mysql 健康检查通过后 orangehrm 才会起，首次拉镜像 + 初始化约 2~5 分钟
-open http://localhost:8080
+open http://127.0.0.1:8071
 ```
 
 ## 首次安装向导（重要）
@@ -30,7 +30,7 @@ open http://localhost:8080
 适配器读到以下环境变量即自动切 REST 模式：
 
 ```bash
-export ORANGEHRM_BASE_URL=http://localhost:8080
+export ORANGEHRM_BASE_URL=http://127.0.0.1:8071
 export ORANGEHRM_CLIENT_ID=<OAuth2 客户端 ID>
 export ORANGEHRM_CLIENT_SECRET=<OAuth2 客户端密钥>
 ```
@@ -55,4 +55,4 @@ docker compose down -v       # 停并清空数据（下次重走安装向导）
 
 已知注意点：
 - orangehrm 容器的 healthcheck 用了容器内 `curl`，若换镜像版本后报 unhealthy，先确认镜像里有 curl；
-- 端口冲突时改 `ports: "8080:80"` 的宿主侧端口，并同步改 `ORANGEHRM_BASE_URL`。
+- 端口冲突时改 `ports: "127.0.0.1:8071:80"` 的宿主侧端口，并同步改 `ORANGEHRM_BASE_URL`。注意本机 8080/8090 会被 ai-edge 网关的 dual-stack 监听（`*:port` IPv6）盖住，macOS 下 `localhost` 优先走 IPv6 会打到网关而非容器——故显式绑 `127.0.0.1` 并用不冲突端口。
