@@ -1,0 +1,44 @@
+# @yiong/foundry-feishu
+
+飞书 bot 入口层：把「谁在问」透传给 Foundry 守卫，用自然语言驱动带权限的企业数据查询。
+
+## 它做什么
+
+- **身份透传**：飞书事件里的 sender `open_id`（服务端签发，客户端伪造不了）经
+  `config/identity.feishu.yaml` 映射成 Foundry principal。绑定是管理动作，
+  不提供任何"自助声明角色"的通道；未绑定用户只收到自己的 open_id 引导，拿不到数据。
+- **按身份收窄的工具面**：LLM 看到的工具列表已按角色过滤——员工的工具定义里根本
+  没有 `get_salary`。安全发生在模型看到工具之前，而非调用被拒之后。
+- **守卫兜底**：模型选的每次工具调用都过 `packages/core` 的 Guard（行级过滤、
+  字段脱敏、结构化拒答、审计）。拒答分支没有 data 字段，模型想编也没材料。
+- **多系统**：HR（OrangeHRM）与记忆（跨会话）两个域各自 RBAC——业务全权 ≠ 记忆全权。
+
+## 跑起来
+
+```bash
+# 1. 建应用（open.feishu.cn 开发者后台）：企业自建应用 + 机器人能力
+#    权限 im:message / contact:user.base:readonly / cardkit:card:write
+#    事件订阅：长连接模式 + im.message.receive_v1；发布版本
+# 2. 配置
+cp config/identity.feishu.example.yaml config/identity.feishu.yaml   # 先留空
+cp packages/feishu/.env.example packages/feishu/.env                 # 填凭据与模型
+# FEISHU_APP_ID / FEISHU_APP_SECRET
+# FOUNDRY_LLM_BASE_URL / _API_KEY / _MODEL（OpenAI 兼容，如智谱 glm-4.6）
+# ORANGEHRM_MYSQL_*（可选：有则 HR 走真库，否则 fixture）
+# 3. 启动（长连接，无需公网回调）
+pnpm --filter @yiong/foundry-feishu serve
+```
+
+首次给 bot 发消息，它会回复你的 open_id；写进 `config/identity.feishu.yaml`
+（例：`ou_xxx: { userId: e002, role: employee }`）重启即生效。把同一个 open_id
+在 `employee` 与 `hr_admin` 之间切换，即可演示"同问不同答"的权限对比。
+
+## 模块
+
+| 文件 | 职责 |
+| --- | --- |
+| `identity.ts` | open_id → principal 映射 |
+| `toolset.ts` | 多系统守卫工具集：按身份收窄 + 按名路由到各系统守卫 |
+| `llm.ts` | OpenAI 兼容 tool-calling 循环（可关思考链降延迟） |
+| `agent.ts` | 系统提示词 + 工具执行编排（拒答如实转述、不越权补数） |
+| `bot.ts` | 长连接接入 + 流式占位（cardkit，缺权限自动回退纯文本） |

@@ -1,0 +1,11 @@
+# 飞书 open_id → Foundry principal 绑定表（模板）。
+# 复制为 config/identity.feishu.yaml 后填入真实 open_id——那个文件被 gitignore，不进仓库。
+#
+# open_id 由飞书服务端签发、客户端伪造不了；这里只做"谁是谁"的绑定，
+# 权限本身仍在 rbac.*.yaml——绑定错了最多拿到错误身份的权限面，不会越过守卫。
+# 未绑定的用户发消息时，bot 会回复其 open_id，复制进来重启即可。
+#
+# 演示身份参考：小王 = { userId: e002, role: employee }；老李 = { userId: e004, role: hr_admin }
+# 同一个 open_id 在 employee 与 hr_admin 之间切换，即可演示"同问不同答"的权限对比。
+identities: {}
+  # ou_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: { userId: e002, role: employee }

@@ -1,0 +1,29 @@
+{
+  "name": "@yiong/foundry-feishu",
+  "version": "0.0.1",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "serve": "node --import tsx bin/serve.ts"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.53.0",
+    "@yiong/foundry-adapter-memory": "workspace:*",
+    "@yiong/foundry-adapter-orangehrm": "workspace:*",
+    "@yiong/foundry-core": "workspace:*",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.0",
+    "zod-to-json-schema": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}

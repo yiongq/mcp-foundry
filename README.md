@@ -18,15 +18,14 @@
 ## 架构
 
 ```
-MCP 客户端（Claude Code / 任意支持 Streamable HTTP 的 host）
-        │  POST /mcp（headers: x-foundry-user / x-foundry-role）
+入口层（二选一，身份都透传给同一套守卫）
+  ├─ MCP 客户端（Claude Code / 任意 Streamable HTTP host）
+  │    POST /mcp，headers: x-foundry-user / x-foundry-role
+  │    → packages/server（@yiong/foundry-server，无状态）
+  └─ 飞书 bot（packages/feishu，长连接，无需公网回调）
+       sender open_id → config/identity.feishu.yaml 映射 → principal
+       → GLM tool-calling 循环（自然语言进、按身份收窄的工具面出）
         ▼
-┌────────────────────────────────────────────┐
-│ packages/server（@yiong/foundry-server）    │
-│ 无状态：每请求 new 一个 McpServer，          │
-│ 只注册该角色白名单内的工具                    │
-└──────────────────┬─────────────────────────┘
-                   ▼
 ┌────────────────────────────────────────────┐     config/rbac.*.yaml
 │ packages/core  Guard 管线                   │◀────（角色→工具 / 行规则 / 脱敏字段）
 │ 角色查找 → 工具白名单 → 行级过滤 → 字段脱敏    │
@@ -39,6 +38,11 @@ MCP 客户端（Claude Code / 任意支持 Streamable HTTP 的 host）
 │              ：memory（跨会话记忆，域内 RBAC）│
 └────────────────────────────────────────────┘
 ```
+
+飞书入口的关键：**安全不靠提示词**。工具面在 LLM 看到之前就按身份收窄（员工的工具
+定义里根本没有 get_salary），越权数据在守卫出口就不存在（refusal 分支无 data 字段），
+模型想编也没材料。同一个人在飞书里换身份问同一句「张三的工资是多少」——员工被结构化
+拒答、HR 返回真实数字，全程留审计。搭建见 [packages/feishu](packages/feishu)。
 
 配套：`packages/eval` 是越权/泄漏评测——47 题（含跨会话记忆召回与越权记忆泄露）、
 硬断言 + LLM-judge 双轨（judge 须先过人工校准）、3 次重复报方差、守卫逐层开/关

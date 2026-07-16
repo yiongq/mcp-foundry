@@ -6,3 +6,6 @@ dist/
 audit/*.jsonl
 eval-reports/
 .DS_Store
+
+# 飞书身份绑定表：含真实 open_id，不进仓库（用 identity.feishu.example.yaml 做模板）
+config/identity.feishu.yaml
