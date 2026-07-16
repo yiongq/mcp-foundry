@@ -19,7 +19,7 @@
 
 ```
 入口层（二选一，身份都透传给同一套守卫）
-  ├─ MCP 客户端（Claude Code / 任意 Streamable HTTP host）
+  ├─ MCP 客户端（Claude Code / Dify / 任意 Streamable HTTP host）
   │    POST /mcp，身份：Bearer 签名令牌（生产）或 x-foundry-* 头（demo）
   │    → packages/server（@yiong/foundry-server，无状态）
   └─ 飞书 bot（packages/feishu，长连接，无需公网回调）
@@ -107,6 +107,11 @@ curl -s http://localhost:3100/mcp \
 改令牌任何一个字节（比如把 role 从 employee 改成 hr_admin）→ 签名作废 → 401；
 过期 → 401；验签不读令牌自述的 alg，"alg: none" 一类降级攻击在结构上不成立。
 飞书入口不走这条：sender open_id 由飞书服务端签发，本身就是可信身份源。
+
+签名令牌让第三方 Agent 平台零代码接入：Dify 已实测（1.16，本地 Docker）——
+同一个 foundry 地址挂两个 MCP server、只有令牌不同，两个 Agent 应用的工具面
+在 Dify 界面里肉眼可见地不同（employee 3 个工具 / hr_admin 4 个），同问不同答、
+审计留痕。步骤与踩坑见 [docs/dify-integration.md](docs/dify-integration.md)。
 
 ## 诚实边界
 
