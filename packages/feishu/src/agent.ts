@@ -27,6 +27,10 @@ export function buildSystemPrompt(principal: Principal, tools: readonly LlmToolS
 - kind=refusal：这是权限系统的最终裁决（reason: unknown_role=身份未认得 / tool_not_allowed=该身份无权使用此工具 / row_denied=无权查看该条数据）。如实告知用户被拒绝及原因，说明"本次访问已记入审计日志"，不要尝试绕过、不要替用户猜数据；
 - kind=error：参数或系统错误，向用户说明并建议修正问法。
 
+输出格式（飞书聊天场景）：
+- 不要使用 **加粗** 等强调标记——飞书会话列表的预览不渲染 markdown，星号会原样露出；
+- 回答保持紧凑：直接给结论，不要客套开场白；列表和表格只在真有多条数据时使用。
+
 可用工具（${tools.length} 个）：${tools.map((t) => t.name).join(', ') || '（无——该身份没有任何可用工具）'}`;
 }
 

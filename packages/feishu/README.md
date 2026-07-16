@@ -17,7 +17,7 @@
 
 ```bash
 # 1. 建应用（open.feishu.cn 开发者后台）：企业自建应用 + 机器人能力
-#    权限 im:message / contact:user.base:readonly / cardkit:card:write
+#    权限 im:message / contact:user.base:readonly（表情回应进度提示需消息表情权限，缺失自动降级）
 #    事件订阅：长连接模式 + im.message.receive_v1；发布版本
 # 2. 配置
 cp config/identity.feishu.example.yaml config/identity.feishu.yaml   # 先留空
@@ -30,8 +30,9 @@ pnpm --filter @yiong/foundry-feishu serve
 ```
 
 首次给 bot 发消息，它会回复你的 open_id；写进 `config/identity.feishu.yaml`
-（例：`ou_xxx: { userId: e002, role: employee }`）重启即生效。把同一个 open_id
-在 `employee` 与 `hr_admin` 之间切换，即可演示"同问不同答"的权限对比。
+（例：`ou_xxx: { userId: e002, role: employee }`）**保存即生效，无需重启**——
+身份表每条消息重读，解析失败沿用上一份有效映射。把同一个 open_id 在
+`employee` 与 `hr_admin` 之间切换，即可现场演示"同问不同答"的权限对比。
 
 ## 模块
 
@@ -41,4 +42,4 @@ pnpm --filter @yiong/foundry-feishu serve
 | `toolset.ts` | 多系统守卫工具集：按身份收窄 + 按名路由到各系统守卫 |
 | `llm.ts` | OpenAI 兼容 tool-calling 循环（可关思考链降延迟） |
 | `agent.ts` | 系统提示词 + 工具执行编排（拒答如实转述、不越权补数） |
-| `bot.ts` | 长连接接入 + 流式占位（cardkit，缺权限自动回退纯文本） |
+| `bot.ts` | 长连接接入；处理中用表情回应反馈（答完摘掉，零残留），答案作为新消息发出以触发自动滚屏；单聊不开线程，群聊保留引用回复 |

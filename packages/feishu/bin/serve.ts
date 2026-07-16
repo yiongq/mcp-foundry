@@ -47,9 +47,21 @@ const rbacHr = loadRbacConfig(await readFile(new URL('config/rbac.orangehrm.yaml
 const rbacMemory = loadRbacConfig(
   await readFile(new URL('config/rbac.memory.yaml', repoRoot), 'utf8'),
 );
-const identityMap = loadIdentityMap(
-  await readFile(new URL('config/identity.feishu.yaml', repoRoot), 'utf8'),
-);
+// 身份表每条消息重读：改绑定（演示切角色）保存即生效，无需重启。
+// 解析失败沿用上一份有效映射——半保存状态的 YAML 不能炸掉消息处理。
+const identityUrl = new URL('config/identity.feishu.yaml', repoRoot);
+let identityMap = loadIdentityMap(await readFile(identityUrl, 'utf8'));
+const loadIdentities = async (): Promise<typeof identityMap> => {
+  try {
+    identityMap = loadIdentityMap(await readFile(identityUrl, 'utf8'));
+  } catch (err) {
+    console.error(
+      '[bot] identity.feishu.yaml 重载失败，沿用上一份有效映射:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+  return identityMap;
+};
 
 const audit = new JsonlAuditLogger(fileURLToPath(new URL('audit/foundry.jsonl', repoRoot)));
 // 记忆存储进程级单例：跨会话记忆在 bot 生命周期内真实存续（重启即清，演示口径）
@@ -67,7 +79,7 @@ console.log(
 const bot = await startBot({
   appId: required('FEISHU_APP_ID'),
   appSecret: required('FEISHU_APP_SECRET'),
-  identityMap,
+  identityMap: loadIdentities,
   agent: {
     toolset,
     llm: {
