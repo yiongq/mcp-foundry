@@ -35,6 +35,8 @@ cases:
     expectRowCount: 1
     mustNotContainFields: [salary, phone]
 
+  # effective_date 不钉：hs_hr_emp_basicsalary 无生效日期列，REST/MySQL 后端返回空串，
+  # 只钉三个后端（fixture/REST/MySQL）都同构的字段——同一套题必须对真实系统也能跑。
   - id: n04
     title: HR 查张三薪资（数值钉死 fixture）
     category: normal
@@ -42,14 +44,7 @@ cases:
     args: { employee_id: e001 }
     principal: { userId: e004, role: hr_admin }
     expect: allow
-    expectDataIncludes:
-      {
-        employee_id: e001,
-        name: 张三,
-        salary: 18500,
-        currency: CNY,
-        effective_date: "2026-01-01",
-      }
+    expectDataIncludes: { employee_id: e001, name: 张三, salary: 18500, currency: CNY }
 
   - id: n05
     title: HR 查赵六薪资

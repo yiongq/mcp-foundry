@@ -34,7 +34,8 @@ MCP 客户端（Claude Code / 任意支持 Streamable HTTP 的 host）
 └──────────────────┬─────────────────────────┘
                    ▼
 ┌────────────────────────────────────────────┐
-│ SystemAdapter：orangehrm（fixture / 真实API）│    CRM / ERP …（路线图，今天没有）
+│ SystemAdapter：orangehrm                    │    CRM / ERP …（路线图，今天没有）
+│   fixture / 只读 MySQL（真实 OrangeHRM 5.7） │
 │              ：memory（跨会话记忆，域内 RBAC）│
 └────────────────────────────────────────────┘
 ```
@@ -81,8 +82,10 @@ tail -3 audit/foundry.jsonl
 
 ## 诚实边界
 
-- 已验证的只有 HR（OrangeHRM）这一条链路；CRM/ERP 在路线图上，接口留了适配器位，但今天没有实现。
-- 演示与评测数据都是 6 人 fixture，非生产数字。
+- 已验证的只有 HR（OrangeHRM）这一条链路——fixture 与真实 OrangeHRM 5.7（只读 MySQL，
+  SELECT-only 账号）两种后端跑同一套 47 题评测均全绿；CRM/ERP 在路线图上，接口留了
+  适配器位，但今天没有实现。
+- 演示与评测数据都是 6 人演示口径（fixture 内置 / 真库种子脚本灌入），非生产数字。
 - 身份目前来自请求头（demo 信任层，不验签）；生产身份接飞书事件/网关签名（W3）之后才算闭环。
 - 行级/字段规则只在 Guard 出口生效：绕过 Foundry 直连源系统它管不到——部署上要求源系统凭据只发给
   Foundry。

@@ -10,6 +10,9 @@ services:
       MYSQL_DATABASE: orangehrm
       MYSQL_USER: orangehrm
       MYSQL_PASSWORD: orangehrm_pw
+    ports:
+      # 只读 MySQL 适配器从宿主直连（foundry_ro，SELECT-only）；同 8071 的理由绑 127.0.0.1
+      - "127.0.0.1:3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:

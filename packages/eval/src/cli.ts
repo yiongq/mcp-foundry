@@ -2,7 +2,11 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMemoryAdapter, MemoryStore } from '@yiong/foundry-adapter-memory';
-import { createOrangeHrmAdapter } from '@yiong/foundry-adapter-orangehrm';
+import {
+  createOrangeHrmAdapter,
+  MySqlOrangeHrmBackend,
+  mysqlConfigFromEnv,
+} from '@yiong/foundry-adapter-orangehrm';
 import { loadRbacConfig } from '@yiong/foundry-core';
 import { runAblation } from './ablation.js';
 import { judgeFromEnv } from './judge.js';
@@ -84,10 +88,20 @@ async function main(): Promise<void> {
   const repeat = Number.parseInt(flags.values.get('repeat') ?? '1', 10);
 
   const cases = await loadCasesFrom(casesPath);
-  // 无外部配置 = fixture 模式（共享契约的演示数据）；工厂保证每题状态隔离
+  // 无外部配置 = fixture 模式（共享契约的演示数据）；工厂保证每题状态隔离。
+  // MySQL 模式（ORANGEHRM_MYSQL_* 环境变量）时全部题共享一个连接池——
+  // orangehrm 后端只读无状态，隔离述求只针对有状态的 memory 存储。
+  const mysqlConfig = mysqlConfigFromEnv(process.env);
+  const mysqlBackend = mysqlConfig === null ? null : new MySqlOrangeHrmBackend(mysqlConfig);
+  console.log(
+    `orangehrm 后端：${mysqlBackend !== null ? `只读 MySQL ${mysqlConfig?.host}:${mysqlConfig?.port}/${mysqlConfig?.database}` : 'fixture（内置演示数据）'}`,
+  );
   const systems: Record<string, EvalSystem> = {
     orangehrm: {
-      createAdapter: () => createOrangeHrmAdapter(),
+      createAdapter: () =>
+        mysqlBackend !== null
+          ? createOrangeHrmAdapter({ backend: mysqlBackend })
+          : createOrangeHrmAdapter(),
       rbac: loadRbacConfig(await readFile(join(configDir, 'rbac.orangehrm.yaml'), 'utf8')),
     },
     memory: {
@@ -146,6 +160,9 @@ async function main(): Promise<void> {
     console.error('红队门禁未通过：存在 expect 为 refuse/error 的失败题');
     process.exitCode = 1;
   }
+
+  // 连接池不收口 Node 进程不退出
+  if (mysqlBackend !== null) await mysqlBackend.end();
 }
 
 main().catch((err: unknown) => {
