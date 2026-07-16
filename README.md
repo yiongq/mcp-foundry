@@ -20,7 +20,7 @@
 ```
 入口层（二选一，身份都透传给同一套守卫）
   ├─ MCP 客户端（Claude Code / 任意 Streamable HTTP host）
-  │    POST /mcp，headers: x-foundry-user / x-foundry-role
+  │    POST /mcp，身份：Bearer 签名令牌（生产）或 x-foundry-* 头（demo）
   │    → packages/server（@yiong/foundry-server，无状态）
   └─ 飞书 bot（packages/feishu，长连接，无需公网回调）
        sender open_id → config/identity.feishu.yaml 映射 → principal
@@ -84,13 +84,40 @@ curl -s http://localhost:3100/mcp \
 tail -3 audit/foundry.jsonl
 ```
 
+## 签名身份（生产模式，W3）
+
+demo 头谁都能自称 hr_admin。设 `FOUNDRY_IDENTITY_SECRET`（≥16 字符）后服务器只认
+HS256 签名令牌，`x-foundry-*` 头被完全忽略——伪造头不是"被拒绝"，是根本不在信任路径上：
+
+```bash
+export FOUNDRY_IDENTITY_SECRET='replace-with-a-16+char-secret'
+pnpm --filter @yiong/foundry-server serve
+
+# 签发令牌（演示里这条 CLI 扮演"网关"这个身份权威；生产由网关/SSO 持同一密钥签发）
+pnpm --filter @yiong/foundry-server run mint-token --user e004 --role hr_admin --ttl 3600
+
+# 用令牌访问（mint-token 会打印完整 curl 示例）
+curl -s http://localhost:3100/mcp \
+  -H 'content-type: application/json' \
+  -H 'accept: application/json, text/event-stream' \
+  -H 'authorization: Bearer <token>' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+改令牌任何一个字节（比如把 role 从 employee 改成 hr_admin）→ 签名作废 → 401；
+过期 → 401；验签不读令牌自述的 alg，"alg: none" 一类降级攻击在结构上不成立。
+飞书入口不走这条：sender open_id 由飞书服务端签发，本身就是可信身份源。
+
 ## 诚实边界
 
 - 已验证的只有 HR（OrangeHRM）这一条链路——fixture 与真实 OrangeHRM 5.7（只读 MySQL，
   SELECT-only 账号）两种后端跑同一套 47 题评测均全绿；CRM/ERP 在路线图上，接口留了
   适配器位，但今天没有实现。
 - 演示与评测数据都是 6 人演示口径（fixture 内置 / 真库种子脚本灌入），非生产数字。
-- 身份目前来自请求头（demo 信任层，不验签）；生产身份接飞书事件/网关签名（W3）之后才算闭环。
+- HTTP 入口的验签是共享密钥 HS256（W3）：签发方与验签方同持一把密钥，适合单网关部署；
+  多签发方、密钥轮换要上非对称签名（JWKS），在路线图上。不设密钥时回落 demo 头模式
+  （启动时打警告），仅供本地演示与评测。
+- 飞书链路的身份（open_id 映射）与守卫代码已就绪，但尚未在真实飞书应用上端到端验证过。
 - 行级/字段规则只在 Guard 出口生效：绕过 Foundry 直连源系统它管不到——部署上要求源系统凭据只发给
   Foundry。
 

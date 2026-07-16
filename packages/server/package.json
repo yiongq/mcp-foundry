@@ -9,7 +9,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "serve": "node --import tsx bin/serve.ts"
+    "serve": "node --import tsx bin/serve.ts",
+    "mint-token": "node --import tsx bin/mint-token.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0",

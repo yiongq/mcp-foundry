@@ -3,21 +3,23 @@
  *
  * 每个请求都 new 一个只注册了该 principal 白名单工具的 McpServer——
  * 权限收窄发生在 tools/list 之前，而不是调用被拒之后。
- * 身份来自 x-foundry-user / x-foundry-role 头（demo 信任层，见 principal.ts；
- * 生产身份来自飞书事件/网关签名，W3 接入）。
+ * 身份解析见 principal.ts：token 模式验网关签名（生产），headers 模式信任
+ * x-foundry-* 头（demo）；两种模式出口同为 Principal，守卫不感知鉴权方式。
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { AuditLogger, Principal, RbacConfig, SystemAdapter } from '@yiong/foundry-core';
 import { Guard } from '@yiong/foundry-core';
-import { extractPrincipal } from './principal.js';
+import { type AuthConfig, resolvePrincipal } from './principal.js';
 import { allowedToolEntries, assertUniqueToolNames, toRawShape } from './registry.js';
 
 export interface FoundryServerOptions {
   adapters: readonly SystemAdapter[];
   rbac: RbacConfig;
   audit: AuditLogger;
+  /** 鉴权模式；缺省 headers（demo 信任层），生产传 { mode: 'token', secret } */
+  auth?: AuthConfig;
   /** MCP serverInfo；默认 mcp-foundry / 0.0.1 */
   name?: string;
   version?: string;
@@ -68,6 +70,7 @@ export async function interceptDeniedToolCall(
 
 export function createFoundryServer(options: FoundryServerOptions): Server {
   assertUniqueToolNames(options.adapters);
+  const auth = options.auth ?? { mode: 'headers' as const };
   const guard = new Guard(options.rbac, options.audit);
   const serverInfo = { name: options.name ?? 'mcp-foundry', version: options.version ?? '0.0.1' };
 
@@ -91,11 +94,12 @@ export function createFoundryServer(options: FoundryServerOptions): Server {
   };
 
   const handleMcp = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-    const principal = extractPrincipal(req.headers);
-    if (principal === null) {
-      sendJsonRpcError(res, 401, 'missing x-foundry-user / x-foundry-role headers');
+    const verdict = resolvePrincipal(req.headers, auth);
+    if (!verdict.ok) {
+      sendJsonRpcError(res, 401, verdict.message);
       return;
     }
+    const principal = verdict.principal;
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(chunk as Buffer);
     let body: unknown;
