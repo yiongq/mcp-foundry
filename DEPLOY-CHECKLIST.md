@@ -155,3 +155,56 @@ curl -m 8 --noproxy '*' https://foundry.yiongspace.com/healthz   # 期望：200
 - [ ] README 诚实边界更新：公网演示地址、令牌到期口径
 - [ ] 审计卷备份策略（`foundry-audit` 卷，可选）
 - [ ] 演示数据仍是 6 人 fixture——对外说明这是演示口径，非生产数字
+
+## 11. 切换到 JWKS / 轮换演示令牌（W7，已实操）
+
+线上从 HS256 切到非对称 JWKS URL 模式：签发私钥只在管理员本机，服务器只见公钥集。
+令牌换成 ES256 后旧 HS256 令牌即时作废。**零中断顺序**（先备份 Caddyfile）：
+
+```bash
+# ① 本机生成密钥对（私钥留本机、绝不上服务器；公钥 JWKS 待会儿上）
+mkdir -p ~/.config/mcp-foundry
+pnpm --filter @yiong/foundry-server run keygen --kid 2026-07-vps \
+  --out ~/.config/mcp-foundry/identity-es256.key \
+  --jwks-out ~/.config/mcp-foundry/jwks.json
+
+# ② 公钥集上服务器，Caddy 在 foundry 站点里静态供给 /jwks.json（与 /mcp 反代分流）
+ssh root@<VPS_IP> 'mkdir -p /opt/foundry-keys'
+scp ~/.config/mcp-foundry/jwks.json root@<VPS_IP>:/opt/foundry-keys/jwks.json
+# Caddyfile 的 foundry 块改成：
+#   foundry.yiongspace.com {
+#       handle /jwks.json { root * /opt/foundry-keys; file_server }
+#       handle { reverse_proxy 127.0.0.1:3100 }
+#   }
+# caddy validate && systemctl reload caddy
+curl -s https://foundry.yiongspace.com/jwks.json | head -3   # 公网可取
+
+# ③ 服务器 .env 加 URL，重建容器（compose 已透传该 env）
+#   FOUNDRY_IDENTITY_JWKS=https://foundry.yiongspace.com/jwks.json
+# docker compose up -d ；日志应见 "signed token via JWKS URL"
+# 容器内 hairpin 自测：fetch 该 URL 应 200（Caddy 回环可达）
+
+# ④ 冒烟：ES256 探针（本机私钥现签），并确认旧 HS256 令牌已 401
+BASE=https://foundry.yiongspace.com \
+FOUNDRY_IDENTITY_KEY=~/.config/mcp-foundry/identity-es256.key \
+FOUNDRY_IDENTITY_KID=2026-07-vps bash smoke.sh   # 五针全绿
+
+# ⑤ 签两枚一年期令牌（本机私钥），更新 Dify 两个 MCP server 的 Authorization header
+pnpm --filter @yiong/foundry-server run mint-token \
+  --key ~/.config/mcp-foundry/identity-es256.key --kid 2026-07-vps \
+  --user e002 --role employee --ttl 31536000
+pnpm --filter @yiong/foundry-server run mint-token \
+  --key ~/.config/mcp-foundry/identity-es256.key --kid 2026-07-vps \
+  --user e004 --role hr_admin --ttl 31536000
+```
+
+Dify 侧坑：MCP server 的 header value 是 masked 受控输入，直接粘贴不一定触发保存
+（存进去仍是旧值 → 握手 401 → 报 "Failed to discover OAuth metadata"）。稳妥做法是
+删掉旧 header 行、Add Header 重填；保存后点 Update 重拉工具面，无 OAuth 报错即成功。
+端到端验收：两个体验链接各问一句「张三的工资是多少」，employee 结构化拒答、
+hr_admin 返回真数字（18500 CNY）。
+
+**轮换/换密钥**：再跑 keygen 换新 kid → 把新 JWK 追加进 `/opt/foundry-keys/jwks.json`
+的 keys（新旧并存过渡，Foundry 按 mtime... 实为 URL 轮询热更新，≤ 刷新间隔生效）→
+用新私钥重签令牌、更新 Dify header → 过渡期结束删旧 JWK 即吊销旧 kid。私钥落盘 0600、
+`.key/.pem` 已被 .gitignore；令牌明文只存本机 `~/.config/mcp-foundry/`（600），不进仓库。

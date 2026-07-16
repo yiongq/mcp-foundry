@@ -204,14 +204,17 @@ ETag/If-None-Match，**忽略 Cache-Control**（这是刷新间隔，不是 HTTP
   链接的工具面与行为**不因 CRM 域并入而改变**——线上网关是否已部署到含 CRM 的版本，
   只影响能否用 sales_* 令牌访问 CRM 工具。
 - HTTP 入口两种生产验签：共享密钥 HS256（W3，单网关）与非对称 JWKS（W5 本地文件 /
-  W6 URL 拉取，ES256/RS256，多签发方 + 热轮换，本地端到端验证 2026-07-17）。边界：
-  URL 模式默认不设 max-stale——端点持续故障（无论是宕机还是被人打瘫）期间**吊销
-  不生效、时延无上界**，只有含陈旧时长的告警日志，要 fail-closed 语义得自己开
-  `FOUNDRY_IDENTITY_JWKS_MAX_STALE`；启动时拉不到端点直接起不来（「不带病上线」的
-  另一面：撞上端点故障的重启=停机，重试靠容器编排的 restart 策略，进程内不重试）；
-  URL 模式只在本地对 node:http 端点验证过，没对真实 SSO/IdP 的 JWKS 端点跑过。
-  **线上实例仍跑 HS256**——单网关口径够用，且切 JWKS 会作废现有长效演示令牌。
-  不设密钥时回落 demo 头模式（启动时打警告），仅供本地演示与评测。
+  W6 URL 拉取，ES256/RS256，多签发方 + 热轮换）。**线上实例现跑 JWKS URL 模式**
+  （W7，2026-07-17 切换）：Foundry 从 `https://foundry.yiongspace.com/jwks.json`
+  拉公钥集，签发私钥只在管理员本机、服务器永不持有；两个体验链接的令牌已换成
+  ES256（kid `2026-07-vps`，TTL 一年、2027-07 到期），旧 HS256 令牌即时作废。
+  边界：URL 模式默认不设 max-stale——端点持续故障（宕机或被打瘫）期间**吊销不生效、
+  时延无上界**，只有含陈旧时长的告警日志，要 fail-closed 得自己开
+  `FOUNDRY_IDENTITY_JWKS_MAX_STALE`；启动时拉不到端点直接起不来（撞上端点故障的
+  重启=停机，重试靠容器编排的 restart 策略，进程内不重试）。这里 JWKS 端点由
+  Foundry 自己的 Caddy 静态供给（签发方=部署方同机），不是独立 SSO/IdP——
+  「多签发方」是能力，线上是单签发方口径。不设任何密钥时回落 demo 头模式
+  （启动时打警告），仅供本地演示与评测。
 - 飞书链路三个域都已在真实飞书应用上端到端验证（HR + 记忆 2026-07-16；CRM
   2026-07-17，网页端实测：sales_rep 查自己的单出真数、联系人电话脱敏而邮箱可见、
   越权查同事商机被 row_denied 并如实转述「已记入审计」、跨域问工资零泄漏；
@@ -224,8 +227,9 @@ ETag/If-None-Match，**忽略 Cache-Control**（这是刷新间隔，不是 HTTP
   不是一套面向访客的登录系统。生产接法是网关/SSO 在用户登录后按其真实身份签发令牌。
 - 线上跑的是 fixture 后端（演示数据），不连真实 OrangeHRM/EspoCRM——两条真库链路都
   只在本地验证过（只读 MySQL，SELECT-only 账号）。
-- 演示令牌 TTL 一年（2027-07 到期）。过期后演示会静默失效——届时用 mint-token 重签
-  并更新 Dify 的 MCP server header。
+- 演示令牌 TTL 一年（2027-07 到期），现为 ES256（JWKS 模式）。过期后演示会静默失效——
+  届时用 mint-token 拿本机私钥重签、更新 Dify 的 MCP server header（步骤见
+  [DEPLOY-CHECKLIST.md](DEPLOY-CHECKLIST.md) 的「切换到 JWKS / 轮换演示令牌」）。
 
 ## 名称说明
 

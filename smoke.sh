@@ -5,9 +5,13 @@
 # 用法：  BASE=https://foundry.yiongspace.com bash smoke.sh
 #         BASE=http://127.0.0.1:3100 bash smoke.sh          （服务器本机）
 #
-# 令牌探针需要密钥来现签（服务器上从 .env 取）：
+# 令牌探针需要密钥来现签，两种模式二选一：
+#   HS256（token 模式，服务器上从 .env 取，容器内签）：
 #         FOUNDRY_IDENTITY_SECRET=… bash smoke.sh
-# 缺密钥时后三针跳过，前两针照跑。
+#   ES256（token-jwks 模式，私钥只在签发方本机，本机签）：
+#         FOUNDRY_IDENTITY_KEY=~/.config/mcp-foundry/identity-es256.key \
+#         FOUNDRY_IDENTITY_KID=<kid> bash smoke.sh
+# 两者都缺时后三针跳过，前两针照跑。
 set -u
 
 BASE="${BASE:-https://foundry.yiongspace.com}"
@@ -35,16 +39,23 @@ else
   bad "伪造 x-foundry-* 头 -> $code (want 401 — 服务可能在 demo 头模式，公网禁止！)"
 fi
 
-# 3-5. 令牌探针：需密钥现签
-if [[ -z "${FOUNDRY_IDENTITY_SECRET:-}" ]]; then
-  printf '  \033[33m—\033[0m 跳过令牌探针（未设 FOUNDRY_IDENTITY_SECRET）\n'
+# 3-5. 令牌探针：需密钥现签。ES256（本机私钥）优先于 HS256（容器内共享密钥）——
+# 与服务端一致：JWKS 与 SECRET 同在时，JWKS 是生效的那个。
+if [[ -n "${FOUNDRY_IDENTITY_KEY:-}" && -n "${FOUNDRY_IDENTITY_KID:-}" ]]; then
+  mint() { # role userId -> token（本机签发，私钥不上服务器）
+    pnpm --filter @yiong/foundry-server run mint-token \
+      --key "$FOUNDRY_IDENTITY_KEY" --kid "$FOUNDRY_IDENTITY_KID" \
+      --user "$2" --role "$1" --ttl 300 2>/dev/null | tail -1
+  }
+elif [[ -n "${FOUNDRY_IDENTITY_SECRET:-}" ]]; then
+  mint() { # role userId -> token（容器内签，密钥来自服务器 .env）
+    docker compose exec -T -e FOUNDRY_IDENTITY_SECRET="$FOUNDRY_IDENTITY_SECRET" foundry-server \
+      pnpm --filter @yiong/foundry-server run mint-token --user "$2" --role "$1" --ttl 300 2>/dev/null | tail -1
+  }
+else
+  printf '  \033[33m—\033[0m 跳过令牌探针（未设 FOUNDRY_IDENTITY_KEY+KID 或 FOUNDRY_IDENTITY_SECRET）\n'
   exit "$fail"
 fi
-
-mint() { # role userId -> token
-  docker compose exec -T -e FOUNDRY_IDENTITY_SECRET="$FOUNDRY_IDENTITY_SECRET" foundry-server \
-    pnpm --filter @yiong/foundry-server run mint-token --user "$2" --role "$1" --ttl 300 2>/dev/null | tail -1
-}
 
 tools_of() { # token -> 逗号分隔的工具名
   curl -s -m 12 -X POST "$BASE/mcp" "${H_JSON[@]}" -H "authorization: Bearer $1" -d "$rpc" |
