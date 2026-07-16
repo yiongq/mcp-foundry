@@ -52,7 +52,7 @@
 模型想编也没材料。同一个人在飞书里换身份问同一句「张三的工资是多少」——员工被结构化
 拒答、HR 返回真实数字，全程留审计。搭建见 [packages/feishu](packages/feishu)。
 
-配套：`packages/eval` 是越权/泄漏评测——77 题跨三个域（HR 29 + 记忆 20 + CRM 28，
+配套：`packages/eval` 是越权/泄漏评测——82 题跨三个域（HR 29 + 记忆 20 + CRM 33，
 含跨会话记忆泄露与跨域越权）、硬断言 + LLM-judge 双轨（judge 须先过人工校准）、
 3 次重复报方差、守卫逐层开/关 ablation 曲线。CI 的 eval-gate 在 fixture 上跑并上传
 报告；方法与实测数据见 [docs/eval-methodology.md](docs/eval-methodology.md)。
@@ -151,7 +151,7 @@ curl -s http://localhost:3100/mcp \
 ## 诚实边界
 
 - 两条业务链路都已对真实系统验证：HR 对真实 OrangeHRM 5.7、CRM 对真实 EspoCRM 9.3
-  （都是只读 MySQL、SELECT-only 账号），fixture 与真库双后端跑同一套 77 题均全绿，
+  （都是只读 MySQL、SELECT-only 账号），fixture 与真库双后端跑同一套 82 题均全绿，
   双域双真库组合亦全绿（[docs/espocrm-notes.md](docs/espocrm-notes.md)）；「已验证」
   指本地 docker 真库、演示数据口径，不是生产环境；ERP 仍是路线图。
 - 演示与评测数据都是演示口径（HR 6 人；CRM 5 客户 / 5 联系人 / 5 商机 / 3 个销售身份），

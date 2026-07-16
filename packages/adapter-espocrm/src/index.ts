@@ -3,6 +3,7 @@ export { createEspoCrmAdapter, mysqlConfigFromEnv } from './adapter.js';
 export type {
   AccountDetail,
   AccountRow,
+  ContactListRow,
   ContactRow,
   EspoCrmBackend,
   OpportunityRow,

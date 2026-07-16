@@ -1,6 +1,7 @@
 import type {
   AccountDetail,
   AccountRow,
+  ContactListRow,
   ContactRow,
   EspoCrmBackend,
   OpportunityRow,
@@ -191,6 +192,20 @@ export class FixtureBackend implements EspoCrmBackend {
 
   async getAccount(accountId: string): Promise<AccountDetail | null> {
     return FIXTURE_ACCOUNTS.find((a) => a.account_id === accountId) ?? null;
+  }
+
+  async listContacts(accountId?: string): Promise<ContactListRow[]> {
+    const rows =
+      accountId === undefined
+        ? FIXTURE_CONTACTS
+        : FIXTURE_CONTACTS.filter((c) => c.account_id === accountId);
+    return rows.map((c) => ({
+      contact_id: c.contact_id,
+      name: c.name,
+      title: c.title,
+      account_id: c.account_id,
+      owner_id: c.owner_id,
+    }));
   }
 
   async getContact(contactId: string): Promise<ContactRow | null> {

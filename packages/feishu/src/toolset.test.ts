@@ -42,7 +42,7 @@ roles:
 const rbacCrm = loadRbacConfig(`
 roles:
   sales_rep:
-    tools: [list_accounts, get_account, get_contact, list_opportunities, get_opportunity]
+    tools: [list_accounts, get_account, list_contacts, get_contact, list_opportunities, get_opportunity]
     rows:
       - field: owner_id
         equals: $self.userId
@@ -102,6 +102,7 @@ describe('GuardedToolset', () => {
     expect(toolset.allowedTools(SUN_QI).map((t) => t.name)).toEqual([
       'list_accounts',
       'get_account',
+      'list_contacts',
       'get_contact',
       'list_opportunities',
       'get_opportunity',

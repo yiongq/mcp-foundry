@@ -1,5 +1,5 @@
 /**
- * 六个工具的统一行结构（fixture 与只读 MySQL 两个后端都必须映射到这套形状）。
+ * 七个工具的统一行结构（fixture 与只读 MySQL 两个后端都必须映射到这套形状）。
  * 字段名刻意用 snake_case——与 RBAC 行规则里的 field（owner_id）逐字对齐。
  * 实体与字段按 EspoCRM 建模（Account / Contact / Opportunity，
  * assigned_user_id 归一为 owner_id），映射已对真实 EspoCRM 9.3 实测验证，
@@ -18,12 +18,16 @@ export interface AccountDetail extends AccountRow {
   city: string;
 }
 
-export interface ContactRow {
+/** 联系人列表行：数据面最小化，不带联系方式——email/phone 只在 get_contact 详情里 */
+export interface ContactListRow {
   contact_id: string;
   name: string;
   title: string;
   account_id: string;
   owner_id: string;
+}
+
+export interface ContactRow extends ContactListRow {
   email: string;
   phone: string;
 }
@@ -53,6 +57,7 @@ export interface PipelineSummaryRow {
 export interface EspoCrmBackend {
   listAccounts(industry?: string): Promise<AccountRow[]>;
   getAccount(accountId: string): Promise<AccountDetail | null>;
+  listContacts(accountId?: string): Promise<ContactListRow[]>;
   getContact(contactId: string): Promise<ContactRow | null>;
   listOpportunities(stage?: string): Promise<OpportunityRow[]>;
   getOpportunity(opportunityId: string): Promise<OpportunityRow | null>;

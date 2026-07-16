@@ -1,7 +1,7 @@
 # EspoCRM 对接笔记（adapter-espocrm）
 
 状态：**真实后端已实现并本地验证（2026-07-16，espocrm/espocrm:9 → 9.3.10）**。
-fixture 与只读 MySQL 双后端跑同一套 28 题（并入全量题库，2026-07-17 起 77 题）均全绿；首版计划里的
+fixture 与只读 MySQL 双后端跑同一套 CRM 题集（33 题，并入全量 82 题）均全绿；首版计划里的
 「待实测」已全部用真库 `DESCRIBE`/metadata 清掉，实测结论沉淀在
 [espocrm-db-schema.md](./espocrm-db-schema.md)，环境与种子见
 [docker/espocrm](../docker/espocrm)。
@@ -35,7 +35,7 @@ fixture 与只读 MySQL 双后端跑同一套 28 题（并入全量题库，2026
 - 环境变量探测：`ESPOCRM_MYSQL_HOST / _USER / _PASSWORD`（库名缺省 espocrm、
   端口缺省 3306），优先级 backend 注入 > mode 显式指定 > 环境变量 > fixture。
 - 验证记录：espocrm 单真库与 HR+CRM 双真库两种组合下全量题库全绿 ×3 重复、
-  方差 0（2026-07-16 为 75/75，2026-07-17 题库扩至 77 后双真库复跑 77/77）；
+  方差 0（2026-07-16 为 75/75；2026-07-17 题库两次扩容至 77、82，双真库复跑均全绿）；
   ablation 四档数字与 fixture 完全一致——守卫行为与后端无关。
 
 ## 诚实边界

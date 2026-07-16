@@ -13,6 +13,7 @@ import {
   accountIdInput,
   contactIdInput,
   listAccountsInput,
+  listContactsInput,
   listOpportunitiesInput,
   opportunityIdInput,
   pipelineSummaryInput,
@@ -87,6 +88,10 @@ class EspoCrmAdapter implements SystemAdapter {
       case 'get_account': {
         const { account_id } = accountIdInput.parse(call.args);
         return { data: await this.backend.getAccount(account_id) };
+      }
+      case 'list_contacts': {
+        const { account_id } = listContactsInput.parse(call.args);
+        return { data: await this.backend.listContacts(account_id) };
       }
       case 'get_contact': {
         const { contact_id } = contactIdInput.parse(call.args);

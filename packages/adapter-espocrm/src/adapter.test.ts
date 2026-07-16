@@ -9,12 +9,13 @@ const adapter = createEspoCrmAdapter({ env: {} });
 // 直调 execute 需要身份占位——espocrm 适配器不读它（权限在守卫层），传谁都一样
 const CALLER: Principal = { userId: 'e000', role: 'test' };
 
-describe('fixture 模式：六个工具', () => {
-  it('tools() 恰好 6 个，名称与顺序稳定', () => {
+describe('fixture 模式：七个工具', () => {
+  it('tools() 恰好 7 个，名称与顺序稳定', () => {
     expect(adapter.system).toBe('espocrm');
     expect(adapter.tools().map((t) => t.name)).toEqual([
       'list_accounts',
       'get_account',
+      'list_contacts',
       'get_contact',
       'list_opportunities',
       'get_opportunity',
@@ -57,6 +58,25 @@ describe('fixture 模式：六个工具', () => {
       phone: '0571-88003003',
       city: '杭州',
     });
+  });
+
+  it('list_contacts：无参 5 行、按 account_id 过滤、列表行不夹带 email/phone', async () => {
+    const { data: all } = await adapter.execute({ tool: 'list_contacts', args: {} }, CALLER);
+    expect(all).toHaveLength(5);
+    const first = (all as Record<string, unknown>[])[0];
+    expect(first).toEqual({
+      contact_id: 'c001',
+      name: '陈建国',
+      title: '采购总监',
+      account_id: 'a001',
+      owner_id: 'e007',
+    });
+
+    const { data: filtered } = await adapter.execute(
+      { tool: 'list_contacts', args: { account_id: 'a003' } },
+      CALLER,
+    );
+    expect((filtered as { contact_id: string }[]).map((c) => c.contact_id)).toEqual(['c003']);
   });
 
   it('get_contact 命中 → 联系人带所属客户与归属销售', async () => {
@@ -172,6 +192,18 @@ describe('config/rbac.espocrm.yaml 与守卫联动', () => {
       'a001',
       'a002',
       'a005',
+    ]);
+  });
+
+  it('孙七拉联系人列表：只见自己名下 3 人', async () => {
+    const guard = await loadGuard();
+    const result = await guard.invoke(adapter, SUN_QI, { tool: 'list_contacts', args: {} });
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect((result.data as { contact_id: string }[]).map((c) => c.contact_id)).toEqual([
+      'c001',
+      'c002',
+      'c005',
     ]);
   });
 

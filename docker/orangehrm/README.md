@@ -71,7 +71,7 @@ export ORANGEHRM_MYSQL_USER=foundry_ro
 export ORANGEHRM_MYSQL_PASSWORD=foundry_ro_pw
 # 可选：ORANGEHRM_MYSQL_DATABASE（缺省 orangehrm）/ ORANGEHRM_LEAVE_TYPE（缺省 年假）
 
-# 47 题评测直接打真库
+# 全量评测直接打真库
 pnpm --filter @yiong/foundry-eval run eval --repeat 3 --ablation
 # MCP server 挂真库
 pnpm --filter @yiong/foundry-server run serve

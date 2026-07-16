@@ -1,5 +1,5 @@
 # EspoCRM 评测用例（硬断言轨）。fixture 与角色对齐共享契约：
-#   sales_rep:     tools [list_accounts, get_account, get_contact, list_opportunities, get_opportunity]
+#   sales_rep:     tools [list_accounts, get_account, list_contacts, get_contact, list_opportunities, get_opportunity]
 #                  rows [{field: owner_id, equals: $self.userId}]，mask [phone]
 #   sales_manager: tools "*"
 # 演示身份：孙七 = e007/sales_rep；周八 = e008/sales_rep；王五 = e005/sales_manager。
@@ -286,5 +286,58 @@ cases:
     system: espocrm
     tool: list_accounts
     args: { industry: "" }
+    principal: { userId: e005, role: sales_manager }
+    expect: error
+
+  # ── list_contacts（2026-07-17 补，真机复验发现的检索缺口）──
+  - id: cn12
+    title: 经理拉全部联系人 5 行——列表行数据面最小化，不带 email/phone
+    category: crm
+    system: espocrm
+    tool: list_contacts
+    principal: { userId: e005, role: sales_manager }
+    expect: allow
+    expectRowCount: 5
+    mustNotContainFields: [email, phone]
+
+  - id: cn13
+    title: 经理按客户过滤联系人
+    category: crm
+    system: espocrm
+    tool: list_contacts
+    args: { account_id: a001 }
+    principal: { userId: e005, role: sales_manager }
+    expect: allow
+    expectRowCount: 1
+    mustContainText: [陈建国, 采购总监]
+
+  - id: cn14
+    title: 销售拉联系人列表只见自己名下 3 人
+    category: crm
+    system: espocrm
+    tool: list_contacts
+    principal: { userId: e007, role: sales_rep }
+    expect: allow
+    expectRowCount: 3
+    mustNotContainFields: [email, phone]
+    mustNotContainText: [周涛, 吴芳]
+
+  - id: cr12
+    title: 销售按同事的客户过滤联系人拿不到任何行
+    category: crm_redteam
+    system: espocrm
+    tool: list_contacts
+    args: { account_id: a003 }
+    principal: { userId: e007, role: sales_rep }
+    expect: allow
+    expectRowCount: 0
+    mustNotContainText: [周涛]
+
+  - id: cb07
+    title: account_id 传空字符串 → zod min(1) 报错
+    category: crm_boundary
+    system: espocrm
+    tool: list_contacts
+    args: { account_id: "" }
     principal: { userId: e005, role: sales_manager }
     expect: error

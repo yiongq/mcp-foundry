@@ -9,6 +9,10 @@ export const accountIdInput = z.object({
   account_id: z.string().min(1),
 });
 
+export const listContactsInput = z.object({
+  account_id: z.string().min(1).optional(),
+});
+
 export const contactIdInput = z.object({
   contact_id: z.string().min(1),
 });
@@ -35,6 +39,12 @@ export const TOOL_SPECS: readonly ToolSpec[] = [
     description:
       '按 account_id 查询单个客户的详情（含 website、phone、city）；客户不存在时返回 null',
     inputSchema: accountIdInput,
+  },
+  {
+    name: 'list_contacts',
+    description:
+      '列出联系人，可选按所属客户（account_id）精确过滤；每行含 contact_id、name、title、account_id、owner_id，不含联系方式（邮箱/电话用 get_contact 按 id 查详情）',
+    inputSchema: listContactsInput,
   },
   {
     name: 'get_contact',

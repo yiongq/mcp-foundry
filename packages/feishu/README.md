@@ -35,7 +35,7 @@ pnpm --filter @yiong/foundry-feishu serve
 （例：`ou_xxx: { userId: e002, role: employee }`）**保存即生效，无需重启**——
 身份表每条消息重读，解析失败沿用上一份有效映射。把同一个 open_id 在
 `employee` 与 `hr_admin` 之间切换，即可现场演示"同问不同答"的权限对比；
-切成 `{ userId: e007, role: sales_rep }` 则工具面换成 CRM 五工具 + 私有记忆
+切成 `{ userId: e007, role: sales_rep }` 则工具面换成 CRM 六工具 + 私有记忆
 ——业绩盘、HR 工具都不在模型的工具列表里（正常对话模型根本不会调它们，只会说
 自己没有这个能力；若模型硬调列表外工具，守卫按 tool_not_allowed / unknown_role
 拒并留审计——这层由单测与评测钉住）。

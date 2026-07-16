@@ -6,7 +6,7 @@
 # email 留明文——公司域名邮箱本身可审计。
 roles:
   sales_rep:
-    tools: [list_accounts, get_account, get_contact, list_opportunities, get_opportunity]
+    tools: [list_accounts, get_account, list_contacts, get_contact, list_opportunities, get_opportunity]
     rows:
       - field: owner_id
         equals: $self.userId

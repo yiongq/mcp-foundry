@@ -1,6 +1,7 @@
 import type {
   AccountDetail,
   AccountRow,
+  ContactListRow,
   ContactRow,
   EspoCrmBackend,
   OpportunityRow,
@@ -65,6 +66,20 @@ LEFT JOIN entity_phone_number epn
 LEFT JOIN phone_number pn ON pn.id = epn.phone_number_id AND pn.deleted = 0
 WHERE a.deleted = 0 AND CAST(a.id AS BINARY) = CAST(? AS BINARY)
 LIMIT 1`;
+
+/** 列表行数据面最小化：不 join 电话/邮箱表——联系方式只在按 id 的详情查询里 */
+const LIST_CONTACTS_SQL = `
+SELECT c.id AS contact_id, ${CONTACT_NAME_EXPR} AS name,
+       COALESCE(ac.role, '') AS title,
+       COALESCE(c.account_id, '') AS account_id,
+       COALESCE(c.assigned_user_id, '') AS owner_id
+FROM contact c
+LEFT JOIN account_contact ac
+  ON ac.contact_id = c.id AND ac.account_id = c.account_id AND ac.deleted = 0
+WHERE c.deleted = 0`;
+
+const LIST_CONTACTS_ACCOUNT_FILTER = ' AND CAST(c.account_id AS BINARY) = CAST(? AS BINARY)';
+const LIST_CONTACTS_ORDER = ' ORDER BY c.id LIMIT 500';
 
 const CONTACT_SQL = `
 SELECT c.id AS contact_id, ${CONTACT_NAME_EXPR} AS name,
@@ -184,6 +199,22 @@ export class MySqlEspoCrmBackend implements EspoCrmBackend {
       phone: String(row.phone),
       city: String(row.city),
     };
+  }
+
+  async listContacts(accountId?: string): Promise<ContactListRow[]> {
+    const executor = await this.getExecutor();
+    const sql =
+      accountId === undefined
+        ? `${LIST_CONTACTS_SQL}${LIST_CONTACTS_ORDER}`
+        : `${LIST_CONTACTS_SQL}${LIST_CONTACTS_ACCOUNT_FILTER}${LIST_CONTACTS_ORDER}`;
+    const rows = await executor.query(sql, accountId === undefined ? [] : [accountId]);
+    return rows.map((row) => ({
+      contact_id: String(row.contact_id),
+      name: String(row.name),
+      title: String(row.title),
+      account_id: String(row.account_id),
+      owner_id: String(row.owner_id),
+    }));
   }
 
   async getContact(contactId: string): Promise<ContactRow | null> {

@@ -60,6 +60,38 @@ describe('MySqlEspoCrmBackend', () => {
     expect(captured[0]?.params).toEqual(['a999']);
   });
 
+  it('listContacts：列表最小化不 join 联系方式表；account_id 过滤字节比较', async () => {
+    const { executor, captured } = fakeExecutor([
+      {
+        contact_id: 'c001',
+        name: '陈建国',
+        title: '采购总监',
+        account_id: 'a001',
+        owner_id: 'e007',
+      },
+    ]);
+    const backend = new MySqlEspoCrmBackend({ ...OPTS, executor });
+
+    const rows = await backend.listContacts('a001');
+    expect(rows[0]).toEqual({
+      contact_id: 'c001',
+      name: '陈建国',
+      title: '采购总监',
+      account_id: 'a001',
+      owner_id: 'e007',
+    });
+    // 数据面最小化：列表 SQL 不得触碰电话/邮箱关联表
+    expect(captured[0]?.sql).not.toContain('entity_phone_number');
+    expect(captured[0]?.sql).not.toContain('entity_email_address');
+    expect(captured[0]?.sql).toContain('CAST(c.account_id AS BINARY) = CAST(? AS BINARY)');
+    expect(captured[0]?.sql).toContain('LIMIT');
+    expect(captured[0]?.params).toEqual(['a001']);
+
+    await backend.listContacts();
+    expect(captured[1]?.sql).not.toContain('c.account_id AS BINARY');
+    expect(captured[1]?.params).toEqual([]);
+  });
+
   it('getContact：姓名拼接、职务取 account_contact.role、邮箱/电话走关联表', async () => {
     const { executor, captured } = fakeExecutor([
       {
