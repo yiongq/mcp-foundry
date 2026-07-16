@@ -1,5 +1,10 @@
-export type { IdentityJwks, IdentityPublicJwk } from './jwks.js';
-export { createJwksFileLoader, loadJwks } from './jwks.js';
+export type {
+  IdentityJwks,
+  IdentityPublicJwk,
+  JwksUrlLoader,
+  JwksUrlLoaderOptions,
+} from './jwks.js';
+export { createJwksFileLoader, createJwksUrlLoader, loadJwks } from './jwks.js';
 export type { AuthConfig, PrincipalVerdict } from './principal.js';
 export { extractPrincipal, ROLE_HEADER, resolvePrincipal, USER_HEADER } from './principal.js';
 export type { GuardedSystem, ToolEntry } from './registry.js';

@@ -164,6 +164,28 @@ pnpm --filter @yiong/foundry-server run mint-token \
 同一个 401，不给探测者区分反馈。拿公钥当 HMAC 密钥的经典混淆攻击在这里没有
 攻击面：JWKS 模式下不存在 HMAC 验签路径。
 
+公钥集也可以直接指向签发方的 JWKS 端点（W6，签发方轮换后无需再往 Foundry 拷文件）：
+
+```bash
+# 值以 http(s):// 开头即走 URL 模式；启动拉一次，拉不到拒绝启动
+FOUNDRY_IDENTITY_JWKS=https://sso.example.com/.well-known/jwks.json \
+FOUNDRY_IDENTITY_JWKS_REFRESH=300 \
+pnpm --filter @yiong/foundry-server serve
+```
+
+之后按 `FOUNDRY_IDENTITY_JWKS_REFRESH`（秒，默认 300）固定轮询刷新——带
+ETag/If-None-Match，**忽略 Cache-Control**（这是刷新间隔，不是 HTTP 缓存 TTL）；
+刷新失败沿用上一份有效集合并打含陈旧时长的警告。信任锚从网络来，运输纪律相应
+收紧：只走 https（明文 http 仅放行 127.0.0.1/[::1] 本地调试，`localhost` 是名字
+不是地址、不放行）；30x 重定向按失败处理（scheme 检查只管第一跳，所以不跟）；
+响应限长 1 MiB（按实际读到的字节数数，不信任 Content-Length）、限时 10s；每次
+密钥集变更打 kid 差集日志（只记 kid，不记密钥材料）。轮换纪律：新 kid 先发布到
+端点、等 **≥2 个刷新间隔**（容一次失败轮询）再用它签发；删 kid 即吊销，最迟一个
+刷新间隔生效。默认可用性优先——端点故障期间沿用旧集合、时延无上界；要 fail-closed
+语义设 `FOUNDRY_IDENTITY_JWKS_MAX_STALE`（秒，须 ≥ 2×刷新间隔 + 10s 拉取超时——稳态
+陈旧度会合法冲到「间隔+在途时延」，还要容一次失败轮询，更紧的截止对健康端点也会误伤）：
+超过该时长没刷新成功，验签一律 401（304 也算刷新成功）。
+
 签名令牌让第三方 Agent 平台零代码接入：Dify 已实测并**上了公网**（自托管 1.16）——
 同一个网关地址挂两个 MCP server、只有令牌不同，两个 Agent 应用的工具面在 Dify 界面里
 肉眼可见地不同（employee 3 个工具 / hr_admin 4 个），同问不同答、审计留痕（上面的两个
@@ -181,11 +203,15 @@ pnpm --filter @yiong/foundry-server run mint-token \
 - 角色不跨域：demo 身份（employee/hr_admin）不在 CRM 域的 RBAC 里，所以两个线上体验
   链接的工具面与行为**不因 CRM 域并入而改变**——线上网关是否已部署到含 CRM 的版本，
   只影响能否用 sales_* 令牌访问 CRM 工具。
-- HTTP 入口两种生产验签：共享密钥 HS256（W3，单网关）与非对称 JWKS（W5，
-  ES256/RS256，多签发方 + 热轮换，本地端到端验证 2026-07-17）。边界：JWKS 只支持
-  本地文件（URL 拉取 + 缓存未做）；**线上实例仍跑 HS256**——单网关口径够用，且切
-  JWKS 会作废现有长效演示令牌。不设密钥时回落 demo 头模式（启动时打警告），
-  仅供本地演示与评测。
+- HTTP 入口两种生产验签：共享密钥 HS256（W3，单网关）与非对称 JWKS（W5 本地文件 /
+  W6 URL 拉取，ES256/RS256，多签发方 + 热轮换，本地端到端验证 2026-07-17）。边界：
+  URL 模式默认不设 max-stale——端点持续故障（无论是宕机还是被人打瘫）期间**吊销
+  不生效、时延无上界**，只有含陈旧时长的告警日志，要 fail-closed 语义得自己开
+  `FOUNDRY_IDENTITY_JWKS_MAX_STALE`；启动时拉不到端点直接起不来（「不带病上线」的
+  另一面：撞上端点故障的重启=停机，重试靠容器编排的 restart 策略，进程内不重试）；
+  URL 模式只在本地对 node:http 端点验证过，没对真实 SSO/IdP 的 JWKS 端点跑过。
+  **线上实例仍跑 HS256**——单网关口径够用，且切 JWKS 会作废现有长效演示令牌。
+  不设密钥时回落 demo 头模式（启动时打警告），仅供本地演示与评测。
 - 飞书链路三个域都已在真实飞书应用上端到端验证（HR + 记忆 2026-07-16；CRM
   2026-07-17，网页端实测：sales_rep 查自己的单出真数、联系人电话脱敏而邮箱可见、
   越权查同事商机被 row_denied 并如实转述「已记入审计」、跨域问工资零泄漏；
