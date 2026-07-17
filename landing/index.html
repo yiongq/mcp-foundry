@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark" data-accent="sage">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mcp-foundry — 守卫型 MCP 网关</title>
+<meta name="description" content="把内部系统接上 MCP，并在协议层前加一道守卫：角色定工具面、行级过滤、字段脱敏、逐调用审计。线上免注册体验。">
+<meta name="theme-color" content="#1f1e1b">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 L28 7 V15 C28 23 22.5 28.5 16 30 C9.5 28.5 4 23 4 15 V7 Z' fill='%231f1e1b' stroke='%238fae8a' stroke-width='2'/%3E%3Cpath d='M10.5 16 L14.5 20 L21.5 12' fill='none' stroke='%23ece9e1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/foundry.css">
+</head>
+<body>
+<div id="page-zh">
+<nav style="position:sticky;top:0;z-index:10;background:color-mix(in oklab,var(--bg-base) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-subtle)">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px;display:flex;align-items:center;gap:26px;height:60px">
+    <span style="display:flex;align-items:center;gap:9px;white-space:nowrap;font-weight:600;font-size:15px;color:var(--fg-strong)"><svg width="20" height="20" viewBox="0 0 32 32" fill="none" style="flex:none" aria-hidden="true"><path d="M16 2 L28 7 V15 C28 23 22.5 28.5 16 30 C9.5 28.5 4 23 4 15 V7 Z" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/><path d="M10.5 16 L14.5 20 L21.5 12" stroke="var(--fg-strong)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>mcp-foundry</span>
+    <div class="nav-links" style="display:flex;align-items:center;gap:22px;font-size:13.5px">
+      <a href="#caps" class="nl">能力</a>
+      <a href="#arch" class="nl">架构</a>
+      <a href="#feishu" class="nl">飞书机器人</a>
+      <a href="#eval" class="nl">评测</a>
+      <a href="#roadmap" class="nl">路线图</a>
+      <a href="https://github.com/yiongq/mcp-foundry" class="nl">GitHub</a>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+      <button class="langbtn" data-setlang="en">中 · <span style="color:var(--fg-muted)">EN</span></button>
+      <a href="#demo" class="btn-a" style="padding:7px 14px;border-radius:var(--r-sm);background:var(--accent);color:var(--fg-on-accent);font-weight:500;font-size:13.5px">在线体验</a>
+    </div>
+  </div>
+</nav>
+
+<header data-screen-label="Hero" style="padding:96px 0 72px;position:relative;overflow:hidden">
+  <div aria-hidden="true" style="position:absolute;inset:0;background:radial-gradient(46% 60% at 30% 20%, color-mix(in oklab,var(--accent) 7%,transparent),transparent 70%);pointer-events:none"></div>
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px;position:relative;animation:aiIn 520ms cubic-bezier(0.16,1,0.3,1)">
+    <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:18px">Guarded MCP Gateway · 线上可体验 · 免注册 · 双域真库已验证</div>
+    <h1 style="margin:0;font-size:clamp(42px,5.4vw,80px);font-weight:700;letter-spacing:-0.045em;line-height:1.08;color:var(--fg-strong);text-wrap:balance">给 Agent 接内部系统,<br>先加一道<span style="color:var(--accent)">守卫</span></h1>
+    <p style="font-size:clamp(17px,2vw,20px);color:var(--fg-muted);margin:22px 0 34px;max-width:720px">角色定工具面、行级过滤、字段脱敏、逐调用审计。不该看到的工具连 tools/list 都不出现——不是模型忍住不说,是数据根本没进上下文。</p>
+      </div>
+</header>
+
+<section id="demo" data-screen-label="对比演示" style="padding:0 0 80px">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="border:1px solid var(--border);border-radius:var(--r-xl);background:var(--bg-panel);box-shadow:var(--shadow-lg);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:14px 22px;border-bottom:1px solid var(--border-subtle)">
+        <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">同一个网关 · 同一句提问:「张三的工资是多少?」</div>
+        <div style="display:flex;gap:8px">
+          <button class="seg" data-demo="employee">员工 · 小王</button>
+          <button class="seg" data-demo="hr">HR · 老李</button>
+        </div>
+      </div>
+      <div class="demo-grid" style="display:grid;grid-template-columns:280px 1fr;min-height:270px">
+        <div style="border-right:1px solid var(--border-subtle);padding:18px 22px;background:var(--bg-base)">
+          <div style="font-size:11.5px;color:var(--fg-faint);margin-bottom:12px;font-family:var(--font-mono)">tools/list · 该身份可见的工具面</div>
+          <div style="display:flex;flex-direction:column;gap:7px" data-tools="zh"></div>
+        </div>
+        <div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px">
+          <div style="align-self:flex-end;background:var(--bg-elev);border-radius:12px;padding:8px 14px;font-size:14px;color:var(--fg);max-width:70%">张三的工资是多少?</div>
+          <div data-answer="zh"><div data-al style="font-size:11px;font-family:var(--font-mono);margin-bottom:7px;opacity:.85"></div><div data-at style="font-size:14px;line-height:1.75"></div></div>
+          <div style="margin-top:auto;font-family:var(--font-mono);font-size:11.5px;color:var(--fg-faint);border-top:1px dashed var(--border-subtle);padding-top:11px">audit/foundry.jsonl ← 本次调用已留痕(参数只记哈希)</div>
+        </div>
+      </div>
+      <div style="padding:13px 22px;border-top:1px solid var(--border-subtle);display:flex;gap:20px;flex-wrap:wrap;font-size:13px;background:var(--bg-base)">
+        <span style="color:var(--fg-muted)">真实链接(Dify · 免注册):</span>
+        <a href="https://dify.yiongspace.com/chat/kg6XFb18BoBfzHj2">员工视角 ↗</a>
+        <a href="https://dify.yiongspace.com/chat/CP3QrYkheA2Zz6P5">HR 视角 ↗</a>
+        <span style="color:var(--fg-faint);font-family:var(--font-mono);font-size:11.5px;margin-left:auto">同一地址 · 仅令牌不同</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="caps" data-screen-label="能力" style="padding:80px 0;background:var(--bg-sunken)">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:40px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">为什么做</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">三个事故 → 三个能力</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">安全不靠提示词自觉——结构化规则在守卫层强制执行。</p>
+    </div>
+    <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:24px 22px">
+        <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--danger);margin-bottom:14px">事故:员工顺嘴一问,拿到同事工资</div>
+        <h3 style="margin:0;font-size:17px;font-weight:600;color:var(--fg-strong)">角色 → 工具白名单</h3>
+        <p style="font-size:13.5px;color:var(--fg-muted);margin:10px 0 0;line-height:1.75">不该用的工具在 tools/list 里根本不出现,而不是调用被拒后再解释。</p>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:24px 22px">
+        <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--danger);margin-bottom:14px">事故:模型把手机号、薪资整行吐进回答</div>
+        <h3 style="margin:0;font-size:17px;font-weight:600;color:var(--fg-strong)">行级过滤 + 字段脱敏</h3>
+        <p style="font-size:13.5px;color:var(--fg-muted);margin:10px 0 0;line-height:1.75">结构化规则在守卫出口强制执行;越权数据不进上下文,模型想编也没材料。</p>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:24px 22px">
+        <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--danger);margin-bottom:14px">事故:出事后翻不出谁问过什么</div>
+        <h3 style="margin:0;font-size:17px;font-weight:600;color:var(--fg-strong)">逐调用审计流水</h3>
+        <p style="font-size:13.5px;color:var(--fg-muted);margin:10px 0 0;line-height:1.75">每次调用一条 JSONL;只记参数哈希不记原文,审计日志不成为第二个泄漏面。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="arch" data-screen-label="架构" style="padding:80px 0">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:36px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">架构</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">所有入口,同一套守卫</h2>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+      <div style="display:flex;flex-direction:column;font-family:var(--font-mono);font-size:13px">
+        <div class="grid-2s" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-panel)">
+            <div style="color:var(--fg-strong);margin-bottom:6px">MCP 客户端</div>
+            <div style="color:var(--fg-faint);font-size:11px;line-height:1.6">Claude Code / Dify / 任意 Streamable HTTP host · Bearer 签名令牌</div>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-panel)">
+            <div style="color:var(--fg-strong);margin-bottom:6px">飞书 bot</div>
+            <div style="color:var(--fg-faint);font-size:11px;line-height:1.6">长连接 · open_id → principal · 工具面按身份收窄</div>
+          </div>
+        </div>
+        <div style="text-align:center;color:var(--accent);padding:8px 0">▼</div>
+        <div style="border:1px solid var(--accent-soft-border);border-radius:var(--r-md);padding:18px;background:var(--accent-soft)">
+          <div style="color:var(--accent-text);margin-bottom:8px">Guard 管线 · packages/core</div>
+          <div style="color:var(--fg-muted);font-size:12px;line-height:1.8">角色查找 → 工具白名单 → 行级过滤 → 字段脱敏 → 审计 JSONL</div>
+        </div>
+        <div style="text-align:center;color:var(--accent);padding:8px 0">▼</div>
+        <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--bg-panel)">
+            <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">orangehrm</div>
+            <div style="color:var(--fg-faint);font-size:11px">HR · 真实 5.7 已验</div>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--bg-panel)">
+            <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">espocrm</div>
+            <div style="color:var(--fg-faint);font-size:11px">CRM · 真实 9.3 已验</div>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--bg-panel)">
+            <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">memory</div>
+            <div style="color:var(--fg-faint);font-size:11px">跨会话记忆 · 域内 RBAC</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">01</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">工具面在 LLM 看到之前就收窄</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">员工的工具定义里根本没有 get_salary;拒答是结构化分支,结构上不可能夹带业务数据。</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">02</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">角色不跨域</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">HR 的通配权力跨不进 CRM,销售看不到全员业绩盘——业务全权 ≠ 跨域全权。</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">03</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">生产级签名身份</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">HS256 共享密钥或 JWKS 非对称(ES256/RS256)+ 热轮换;伪造头不是被拒绝,是根本不在信任路径上。线上实例现跑 JWKS URL 模式。</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">04</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">两分钟本地验证</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">fixture 模式无需任何密钥:pnpm install 后换身份问同一个问题,行为不同——这正是卖点。</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--bg-panel)">
+          <pre style="margin:0;padding:14px 18px;font-family:var(--font-mono);font-size:12px;line-height:1.8;color:var(--fg);overflow-x:auto;background:var(--bg-base)">git clone https://github.com/yiongq/mcp-foundry
+cd mcp-foundry && pnpm install
+pnpm --filter @yiong/foundry-server serve
+<span style="color:var(--fg-faint)"># → http://localhost:3100/mcp</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="feishu" data-screen-label="飞书机器人" style="padding:80px 0;background:var(--bg-sunken)">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:36px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">飞书机器人</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">自然语言进,按身份收窄的工具面出</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">长连接接入,无需公网回调。sender open_id 映射到 principal,同一套守卫——安全不靠提示词。三个域已在真实飞书应用上端到端验证。</p>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+      <div style="border:1px solid var(--border);border-radius:var(--r-xl);background:var(--bg-panel);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--border-subtle)">
+          <div style="width:28px;height:28px;border-radius:var(--r-sm);background:var(--accent-soft);border:1px solid var(--accent-soft-border);display:grid;place-items:center;font-family:var(--font-mono);font-size:12px;color:var(--accent-text)">F</div>
+          <div style="font-size:13px;font-weight:600;color:var(--fg-strong)">Foundry 助手</div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="seg" data-fsid="sales">销售 · 孙七</button>
+            <button class="seg" data-fsid="hr">HR · 老李</button>
+          </div>
+        </div>
+        <div style="padding:18px;display:flex;flex-direction:column;gap:13px;min-height:300px" data-fs="zh"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">01</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">工具面在 LLM 看到之前收窄</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">GLM tool-calling 循环拿到的工具定义已按身份过滤——员工的定义里根本没有 get_salary。</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">02</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">越权数据在出口就不存在</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">refusal 分支无 data 字段,模型想编也没材料;拒答如实转述「已记入审计」。</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">03</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">跨域实测零泄漏</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">sales_rep 跨域问工资零泄漏;hr_admin 反向无任何 CRM 能力——业务全权 ≠ 跨域全权。</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">04</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">身份源可信</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">sender open_id 由飞书服务端签发,经 identity.feishu.yaml 映射到 principal,全程留审计。</div></div>
+        </div>
+        <a href="https://github.com/yiongq/mcp-foundry/tree/main/packages/feishu" style="font-family:var(--font-mono);font-size:13px">packages/feishu · 搭建指南 →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="eval" data-screen-label="评测" style="padding:80px 0">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:40px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">评测</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">守卫的价值是分数差,不是一句「我们有 RBAC」</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">82 题越权/泄漏题库跨三个域,硬断言 + LLM-judge 双轨(judge 须先过人工校准,只能加严不能翻案),所有实测数据可本机复现。</p>
+    </div>
+    <div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:44px">
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">82</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">题 × 9 类,跨三个域<br>HR 29 · 记忆 20 · CRM 33</div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">100%</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">全开配置全绿<br>fixture 与双真库均通过</div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">0.00</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">×3 重复通过率标准差<br>(百分点) · 无摇摆题</div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">0</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">生产配置泄漏题数<br>红队拦截率 100%</div>
+      </div>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+      <div>
+        <div style="font-weight:600;color:var(--fg-strong);font-size:16px;margin-bottom:6px">守卫逐层 Ablation(75 题,双真库数字完全一致)</div>
+        <div style="font-size:13px;color:var(--fg-muted);margin-bottom:20px">同一套题在四档守卫配置下各跑一遍——每一层的贡献是可测的:</div>
+        <div style="display:flex;flex-direction:column;gap:13px">
+          <div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">全关（无守卫）</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:49.3%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">49.3%</div></div>
+<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">仅角色+工具白名单</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:64.0%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">64.0%</div></div>
+<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">白名单+行级过滤</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:96.0%;background:color-mix(in oklab, var(--success) 60%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">96.0%</div></div>
+<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">全开（生产配置）</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:100.0%;background:var(--success);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--success)">100.0%</div></div>
+        </div>
+        <div style="font-size:12.5px;color:var(--fg-faint);margin-top:16px;line-height:1.75">泄漏题数:33 → 22 → 3 → 0。工具白名单先砍掉一半攻击面;<b style="color:var(--fg-muted)">行级过滤是拦截主力</b>(红队拦截 58.8% → 100%);字段脱敏清掉最后一条泄漏。</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">01</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">judge 不过校准线不上岗</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">对人工标注 golden 集一致率 ≥90% 才允许进报告;换模型 = 重新过校准。judge 只能把通过的题追加判失败,不能翻案救回。</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">02</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">双轨的价值在发现,不在分数</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">judge 上岗第一轮就抓到一个硬断言看不见的出口污染(ZodError 原样透传),修复后沉淀为确定性回归断言。</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">03</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">CI 门禁只信硬断言</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">红队题任何一道失败,CI 退出码 1;LLM-judge 有成本且依赖外部 API,不进门禁。</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--bg-panel)">
+          <div style="padding:10px 18px;border-bottom:1px solid var(--border-subtle);font-family:var(--font-mono);font-size:11px;color:var(--fg-muted)">本机复现(无需密钥)</div>
+          <pre style="margin:0;padding:14px 18px;font-family:var(--font-mono);font-size:12px;line-height:1.7;color:var(--fg);overflow-x:auto;background:var(--bg-base)">pnpm --filter @yiong/foundry-eval run eval \
+  --repeat 3 --ablation</pre>
+        </div>
+        <a href="https://github.com/yiongq/mcp-foundry/blob/main/docs/eval-methodology.md" style="font-family:var(--font-mono);font-size:13px">docs/eval-methodology.md · 完整方法与边界 →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="boundaries" data-screen-label="诚实边界" style="padding:80px 0;background:var(--bg-sunken)">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:36px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">诚实边界</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">说清楚验证了什么、没验证什么</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:640px">安全产品最怕过度承诺。以下边界与 README 保持同步:</p>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px 32px;font-size:13.5px;line-height:1.8;color:var(--fg-muted)">
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>双真库(OrangeHRM 5.7 / EspoCRM 9.3,只读 MySQL)82 题全绿——指本地 docker、演示数据口径,<b style="color:var(--fg-strong)">不是生产环境</b></span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>线上跑 fixture 后端(演示数据),不连真实 HR/CRM 系统</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>体验链接的身份是<b style="color:var(--fg-strong)">配好的</b>,不是登录来的——演示「同一网关、不同身份、行为不同」,不是登录系统</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>行级/字段规则只在 Guard 出口生效;绕过 Foundry 直连源系统管不到——源系统凭据只发给 Foundry</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>JWKS URL 模式默认可用性优先:端点持续故障期间吊销不生效,fail-closed 需自行开启 max-stale</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>ERP 仍是路线图;「多签发方」是能力,线上是单签发方口径</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="roadmap" data-screen-label="路线图" style="padding:80px 0">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:40px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">路线图</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">8 项里程碑:5 项已交付 · 3 项规划中</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">每一项「已交付」都附带可复现的验证口径。</p>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block"></span>
+          <span style="font-family:var(--font-mono);font-size:12.5px;color:var(--success)">已落地</span>
+        </div>
+        <div style="display:flex;flex-direction:column">
+          <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">HR 域 + Guard 管线</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">真库已验</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">角色白名单 / 行级过滤 / 字段脱敏 / 审计 JSONL；对真实 OrangeHRM 5.7 只读 MySQL 全绿。</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">记忆域（跨会话，域内 RBAC）</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">越权召回走行级规则兜底；投毒防线是接口级——save_memory 根本没有 employee_id 参数。</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">CRM 域（espocrm 适配器）</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">同一套用例 schema 迁移一次写成全绿；对真实 EspoCRM 9.3 同样全绿，角色不跨域。</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">签名身份：HS256 → JWKS → URL 拉取</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">线上已切</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">ES256/RS256 多签发方 + 热轮换；线上实例现跑 JWKS URL 模式，私钥永不落服务器。</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">飞书 bot 三域端到端 + Dify 公网</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">真实飞书应用实测脱敏/拒答/审计；Dify 双身份体验链接上公网，免注册可试。</div></div></div>
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+          <span style="width:8px;height:8px;border-radius:50%;border:1.5px solid var(--fg-faint);display:inline-block"></span>
+          <span style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">规划中</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="border:1px dashed var(--border-strong);border-radius:var(--r-lg);background:var(--bg-panel);padding:18px 20px"><div style="font-weight:600;color:var(--fg-strong);font-size:15px;margin-bottom:4px">ERP 适配器</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">第三个业务域——检验 SystemAdapter 抽象在财务形状数据上的迁移成本。</div></div>
+<div style="border:1px dashed var(--border-strong);border-radius:var(--r-lg);background:var(--bg-panel);padding:18px 20px"><div style="font-weight:600;color:var(--fg-strong);font-size:15px;margin-bottom:4px">第三方红队</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">现状是出题人和被评人同仓同评审；引入外部对抗测试补上这个口径。</div></div>
+<div style="border:1px dashed var(--border-strong);border-radius:var(--r-lg);background:var(--bg-panel);padding:18px 20px"><div style="font-weight:600;color:var(--fg-strong);font-size:15px;margin-bottom:4px">独立签发方（SSO/IdP）</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">线上现为单签发方口径（签发方=部署方同机）；接真实 SSO 验证多签发方与轮换纪律。</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer style="border-top:1px solid var(--border-subtle);padding:36px 28px;color:var(--fg-faint);font-size:12.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;max-width:1120px;margin:0 auto;box-sizing:border-box">
+  <span style="font-family:var(--font-mono)">mcp-foundry</span>
+  <span style="display:flex;gap:20px;flex-wrap:wrap">
+    <a href="https://github.com/yiongq/mcp-foundry" style="color:var(--fg-muted)">GitHub</a>
+    <a href="https://github.com/yiongq/mcp-foundry/blob/main/docs/eval-methodology.md" style="color:var(--fg-muted)">评测方法</a>
+    <a href="https://github.com/yiongq/mcp-foundry/blob/main/DEPLOY-CHECKLIST.md" style="color:var(--fg-muted)">部署清单</a>
+    <a href="/jwks.json" style="color:var(--fg-muted)">公钥集 /jwks.json</a>
+  </span>
+</footer>
+</div>
+<div id="page-en" hidden>
+<nav style="position:sticky;top:0;z-index:10;background:color-mix(in oklab,var(--bg-base) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-subtle)">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px;display:flex;align-items:center;gap:26px;height:60px">
+    <span style="display:flex;align-items:center;gap:9px;white-space:nowrap;font-weight:600;font-size:15px;color:var(--fg-strong)"><svg width="20" height="20" viewBox="0 0 32 32" fill="none" style="flex:none" aria-hidden="true"><path d="M16 2 L28 7 V15 C28 23 22.5 28.5 16 30 C9.5 28.5 4 23 4 15 V7 Z" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/><path d="M10.5 16 L14.5 20 L21.5 12" stroke="var(--fg-strong)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>mcp-foundry</span>
+    <div class="nav-links" style="display:flex;align-items:center;gap:22px;font-size:13.5px">
+      <a href="#caps-en" class="nl">Capabilities</a>
+      <a href="#arch-en" class="nl">Architecture</a>
+      <a href="#feishu-en" class="nl">Feishu bot</a>
+      <a href="#eval-en" class="nl">Evals</a>
+      <a href="#roadmap-en" class="nl">Roadmap</a>
+      <a href="https://github.com/yiongq/mcp-foundry" class="nl">GitHub</a>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+      <button class="langbtn" data-setlang="zh"><span style="color:var(--fg-muted)">中</span> · EN</button>
+      <a href="#demo-en" class="btn-a" style="padding:7px 14px;border-radius:var(--r-sm);background:var(--accent);color:var(--fg-on-accent);font-weight:500;font-size:13.5px">Live demo</a>
+    </div>
+  </div>
+</nav>
+
+<header data-screen-label="Hero EN" style="padding:96px 0 72px;position:relative;overflow:hidden">
+  <div aria-hidden="true" style="position:absolute;inset:0;background:radial-gradient(46% 60% at 30% 20%, color-mix(in oklab,var(--accent) 7%,transparent),transparent 70%);pointer-events:none"></div>
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px;position:relative;animation:aiIn 520ms cubic-bezier(0.16,1,0.3,1)">
+    <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:18px">Guarded MCP Gateway · live demo · no signup · verified on two real backends</div>
+    <h1 style="margin:0;font-size:clamp(40px,5vw,74px);font-weight:700;letter-spacing:-0.04em;line-height:1.06;color:var(--fg-strong);text-wrap:balance">Put a <span style="color:var(--accent)">guard</span> in front of<br>your internal systems</h1>
+    <p style="font-size:clamp(17px,2vw,20px);color:var(--fg-muted);margin:22px 0 34px;max-width:720px">Role-scoped tools, row-level filtering, field masking, per-call audit. Off-limits tools never appear in tools/list at all — it's not the model holding back; the data never enters the context.</p>
+      </div>
+</header>
+
+<section id="demo-en" data-screen-label="Demo EN" style="padding:0 0 80px">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="border:1px solid var(--border);border-radius:var(--r-xl);background:var(--bg-panel);box-shadow:var(--shadow-lg);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:14px 22px;border-bottom:1px solid var(--border-subtle)">
+        <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">Same gateway · same question: "What is Zhang San's salary?"</div>
+        <div style="display:flex;gap:8px">
+          <button class="seg" data-demo="employee">Employee · Wang</button>
+          <button class="seg" data-demo="hr">HR · Li</button>
+        </div>
+      </div>
+      <div class="demo-grid" style="display:grid;grid-template-columns:280px 1fr;min-height:270px">
+        <div style="border-right:1px solid var(--border-subtle);padding:18px 22px;background:var(--bg-base)">
+          <div style="font-size:11.5px;color:var(--fg-faint);margin-bottom:12px;font-family:var(--font-mono)">tools/list · surface for this identity</div>
+          <div style="display:flex;flex-direction:column;gap:7px" data-tools="en"></div>
+        </div>
+        <div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px">
+          <div style="align-self:flex-end;background:var(--bg-elev);border-radius:12px;padding:8px 14px;font-size:14px;color:var(--fg);max-width:70%">What is Zhang San's salary?</div>
+          <div data-answer="en"><div data-al style="font-size:11px;font-family:var(--font-mono);margin-bottom:7px;opacity:.85"></div><div data-at style="font-size:14px;line-height:1.75"></div></div>
+          <div style="margin-top:auto;font-family:var(--font-mono);font-size:11.5px;color:var(--fg-faint);border-top:1px dashed var(--border-subtle);padding-top:11px">audit/foundry.jsonl ← this call was logged (params stored as hashes)</div>
+        </div>
+      </div>
+      <div style="padding:13px 22px;border-top:1px solid var(--border-subtle);display:flex;gap:20px;flex-wrap:wrap;font-size:13px;background:var(--bg-base)">
+        <span style="color:var(--fg-muted)">Real links (Dify · no signup):</span>
+        <a href="https://dify.yiongspace.com/chat/kg6XFb18BoBfzHj2">Employee view ↗</a>
+        <a href="https://dify.yiongspace.com/chat/CP3QrYkheA2Zz6P5">HR view ↗</a>
+        <span style="color:var(--fg-faint);font-family:var(--font-mono);font-size:11.5px;margin-left:auto">same endpoint · only the token differs</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="caps-en" data-screen-label="Capabilities EN" style="padding:80px 0;background:var(--bg-sunken)">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:40px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">why</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">Three incidents → three capabilities</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">Safety doesn't rely on prompt discipline — structured rules are enforced at the guard layer.</p>
+    </div>
+    <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:24px 22px">
+        <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--danger);margin-bottom:14px">Incident: a casual question returns a coworker's salary</div>
+        <h3 style="margin:0;font-size:17px;font-weight:600;color:var(--fg-strong)">Role → tool whitelist</h3>
+        <p style="font-size:13.5px;color:var(--fg-muted);margin:10px 0 0;line-height:1.75">Off-limits tools never appear in tools/list — instead of rejecting the call and explaining afterwards.</p>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:24px 22px">
+        <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--danger);margin-bottom:14px">Incident: the model dumps whole rows — phones, salaries — into answers</div>
+        <h3 style="margin:0;font-size:17px;font-weight:600;color:var(--fg-strong)">Row filtering + field masking</h3>
+        <p style="font-size:13.5px;color:var(--fg-muted);margin:10px 0 0;line-height:1.75">Enforced at the guard's exit; unauthorized data never enters the context, so there's nothing to leak.</p>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:24px 22px">
+        <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--danger);margin-bottom:14px">Incident: afterwards, no one can tell who asked what, when</div>
+        <h3 style="margin:0;font-size:17px;font-weight:600;color:var(--fg-strong)">Per-call audit trail</h3>
+        <p style="font-size:13.5px;color:var(--fg-muted);margin:10px 0 0;line-height:1.75">One JSONL line per call; params stored as hashes, never raw — the audit log doesn't become a second leak surface.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="arch-en" data-screen-label="Architecture EN" style="padding:80px 0">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:36px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">architecture</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">Every entry point, one guard pipeline</h2>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+      <div style="display:flex;flex-direction:column;font-family:var(--font-mono);font-size:13px">
+        <div class="grid-2s" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-panel)">
+            <div style="color:var(--fg-strong);margin-bottom:6px">MCP clients</div>
+            <div style="color:var(--fg-faint);font-size:11px;line-height:1.6">Claude Code / Dify / any Streamable HTTP host · Bearer signed tokens</div>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-panel)">
+            <div style="color:var(--fg-strong);margin-bottom:6px">Feishu bot</div>
+            <div style="color:var(--fg-faint);font-size:11px;line-height:1.6">long connection · open_id → principal · identity-scoped tools</div>
+          </div>
+        </div>
+        <div style="text-align:center;color:var(--accent);padding:8px 0">▼</div>
+        <div style="border:1px solid var(--accent-soft-border);border-radius:var(--r-md);padding:18px;background:var(--accent-soft)">
+          <div style="color:var(--accent-text);margin-bottom:8px">Guard pipeline · packages/core</div>
+          <div style="color:var(--fg-muted);font-size:12px;line-height:1.8">role lookup → tool whitelist → row filter → field masking → audit JSONL</div>
+        </div>
+        <div style="text-align:center;color:var(--accent);padding:8px 0">▼</div>
+        <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--bg-panel)">
+            <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">orangehrm</div>
+            <div style="color:var(--fg-faint);font-size:11px">HR · real 5.7 verified</div>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--bg-panel)">
+            <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">espocrm</div>
+            <div style="color:var(--fg-faint);font-size:11px">CRM · real 9.3 verified</div>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--bg-panel)">
+            <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">memory</div>
+            <div style="color:var(--fg-faint);font-size:11px">cross-session · in-domain RBAC</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">01</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">The tool surface narrows before the LLM sees it</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">An employee's tool definitions simply don't include get_salary; refusals are a structured branch that can't carry business data.</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">02</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">Roles don't cross domains</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">HR's wildcard power stops at the HR domain; a sales rep can't see the team pipeline — full power in one domain ≠ power everywhere.</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">03</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">Production-grade signed identity</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">HS256 shared secret or asymmetric JWKS (ES256/RS256) with hot rotation; a forged header isn't "rejected" — it's never on the trust path. The live instance runs JWKS URL mode.</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">04</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">Verify locally in two minutes</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">Fixture mode, no secrets: ask the same question as different identities and watch the behavior change — that's the whole point.</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--bg-panel)">
+          <pre style="margin:0;padding:14px 18px;font-family:var(--font-mono);font-size:12px;line-height:1.8;color:var(--fg);overflow-x:auto;background:var(--bg-base)">git clone https://github.com/yiongq/mcp-foundry
+cd mcp-foundry && pnpm install
+pnpm --filter @yiong/foundry-server serve
+<span style="color:var(--fg-faint)"># → http://localhost:3100/mcp</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="feishu-en" data-screen-label="Feishu EN" style="padding:80px 0;background:var(--bg-sunken)">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:36px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">Feishu bot</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">Natural language in, identity-scoped tools out</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">Long-connection integration, no public callback. Sender open_id maps to a principal behind the same guard — safety never relies on prompts. All three domains verified end-to-end on a real Feishu app.</p>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+      <div style="border:1px solid var(--border);border-radius:var(--r-xl);background:var(--bg-panel);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--border-subtle)">
+          <div style="width:28px;height:28px;border-radius:var(--r-sm);background:var(--accent-soft);border:1px solid var(--accent-soft-border);display:grid;place-items:center;font-family:var(--font-mono);font-size:12px;color:var(--accent-text)">F</div>
+          <div style="font-size:13px;font-weight:600;color:var(--fg-strong)">Foundry Assistant</div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="seg" data-fsid="sales">Sales · Sun</button>
+            <button class="seg" data-fsid="hr">HR · Li</button>
+          </div>
+        </div>
+        <div style="padding:18px;display:flex;flex-direction:column;gap:13px;min-height:300px" data-fs="en"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">01</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">Tool surface narrows before the LLM sees it</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">The GLM tool-calling loop receives identity-filtered tool definitions — an employee's set simply has no get_salary.</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">02</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">Unauthorized data never exists at the exit</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">The refusal branch has no data field — nothing to fabricate from; refusals honestly report "logged to audit".</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">03</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">Zero cross-domain leaks, tested live</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">sales_rep asking about salaries leaks nothing; hr_admin has no CRM capability at all — domain power doesn't travel.</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">04</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">Trusted identity source</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">Sender open_id is issued by Feishu's servers, mapped via identity.feishu.yaml to a principal; everything is audited.</div></div>
+        </div>
+        <a href="https://github.com/yiongq/mcp-foundry/tree/main/packages/feishu" style="font-family:var(--font-mono);font-size:13px">packages/feishu · setup guide →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="eval-en" data-screen-label="Evals EN" style="padding:80px 0">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:40px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">evals</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">A guard's value is a score gap, not "we have RBAC"</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">82 leak/privilege cases across three domains; hard assertions + LLM-judge dual track (judge must pass human calibration, and can only add failures). All numbers reproducible locally.</p>
+    </div>
+    <div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:44px">
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">82</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">cases × 9 categories, 3 domains<br>HR 29 · memory 20 · CRM 33</div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">100%</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">green with guards fully on<br>fixture and both real DBs</div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">0.00</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">std-dev over ×3 repeats (pts)<br>no flaky cases</div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">0</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">leaks in production config<br>red-team block rate 100%</div>
+      </div>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+      <div>
+        <div style="font-weight:600;color:var(--fg-strong);font-size:16px;margin-bottom:6px">Per-layer guard ablation (75 cases; identical on both real DBs)</div>
+        <div style="font-size:13px;color:var(--fg-muted);margin-bottom:20px">The same suite under four guard configurations — each layer's contribution is measurable:</div>
+        <div style="display:flex;flex-direction:column;gap:13px">
+          <div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">all off (no guard)</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:49.3%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">49.3%</div></div>
+<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">role + whitelist only</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:64.0%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">64.0%</div></div>
+<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">+ row filtering</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:96.0%;background:color-mix(in oklab, var(--success) 60%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">96.0%</div></div>
+<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">all on (production)</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:100.0%;background:var(--success);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--success)">100.0%</div></div>
+        </div>
+        <div style="font-size:12.5px;color:var(--fg-faint);margin-top:16px;line-height:1.75">Leaks: 33 → 22 → 3 → 0. The whitelist halves the attack surface; <b style="color:var(--fg-muted)">row filtering is the main blocker</b> (red-team block 58.8% → 100%); field masking clears the last leak.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">01</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">No calibration pass, no judge</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">≥90% agreement with a human-labeled golden set before a judge enters reports; new model = recalibrate. The judge can only add failures, never rescue them.</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">02</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">The dual track's value is discovery, not scores</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">On its first run the judge caught exit contamination invisible to hard assertions (a raw ZodError passthrough); the fix became a deterministic regression assertion.</div></div>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">03</div>
+          <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">The CI gate trusts hard assertions only</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">Any failed red-team case → CI exit 1; the LLM-judge costs money and depends on external APIs, so it stays out of the gate.</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--bg-panel)">
+          <div style="padding:10px 18px;border-bottom:1px solid var(--border-subtle);font-family:var(--font-mono);font-size:11px;color:var(--fg-muted)">reproduce locally (no secrets)</div>
+          <pre style="margin:0;padding:14px 18px;font-family:var(--font-mono);font-size:12px;line-height:1.7;color:var(--fg);overflow-x:auto;background:var(--bg-base)">pnpm --filter @yiong/foundry-eval run eval \
+  --repeat 3 --ablation</pre>
+        </div>
+        <a href="https://github.com/yiongq/mcp-foundry/blob/main/docs/eval-methodology.md" style="font-family:var(--font-mono);font-size:13px">docs/eval-methodology.md · full methodology →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="boundaries-en" data-screen-label="Limits EN" style="padding:80px 0;background:var(--bg-sunken)">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:36px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">honest limits</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">What was verified — and what wasn't</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:640px">Overpromising is the worst failure mode for a security product. These limits stay in sync with the README:</p>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px 32px;font-size:13.5px;line-height:1.8;color:var(--fg-muted)">
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>82 cases green against both real DBs (OrangeHRM 5.7 / EspoCRM 9.3, read-only MySQL) — local docker, demo-scale data, <b style="color:var(--fg-strong)">not production</b></span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>The live instance runs the fixture backend (demo data), not a real HR/CRM system</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>Demo identities are <b style="color:var(--fg-strong)">pre-configured</b>, not logged in — it demonstrates "same gateway, different identity, different behavior", not a login system</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>Row/field rules apply only at the guard's exit; bypassing Foundry to hit the source system directly is out of scope — source credentials go to Foundry only</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>JWKS URL mode defaults to availability-first: during a prolonged endpoint outage revocation doesn't take effect; fail-closed requires opting into max-stale</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>ERP is still roadmap; "multi-issuer" is a capability — the live deployment is single-issuer</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="roadmap-en" data-screen-label="Roadmap EN" style="padding:80px 0">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:40px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">roadmap</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">8 milestones: 5 shipped · 3 planned</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">Every shipped item carries a reproducible verification story.</p>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block"></span>
+          <span style="font-family:var(--font-mono);font-size:12.5px;color:var(--success)">shipped</span>
+        </div>
+        <div style="display:flex;flex-direction:column">
+          <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">HR domain + Guard pipeline</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">real DB verified</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Role whitelist / row filtering / field masking / audit JSONL; green against real OrangeHRM 5.7 over read-only MySQL.</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Memory domain (cross-session, in-domain RBAC)</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Unauthorized recall blocked by row rules; poisoning defended at the interface — save_memory has no employee_id parameter at all.</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">CRM domain (espocrm adapter)</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Same case schema migrated green on the first pass; also green against real EspoCRM 9.3. Roles never cross domains.</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Signed identity: HS256 → JWKS → URL fetch</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">live</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">ES256/RS256 multi-issuer with hot rotation; the live instance runs JWKS URL mode — private keys never touch the server.</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Feishu bot ×3 domains + Dify public</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Masking / refusals / audit tested on a real Feishu app; dual-identity Dify demo links live, no signup.</div></div></div>
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+          <span style="width:8px;height:8px;border-radius:50%;border:1.5px solid var(--fg-faint);display:inline-block"></span>
+          <span style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">planned</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="border:1px dashed var(--border-strong);border-radius:var(--r-lg);background:var(--bg-panel);padding:18px 20px"><div style="font-weight:600;color:var(--fg-strong);font-size:15px;margin-bottom:4px">ERP adapter</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">A third business domain — testing the SystemAdapter abstraction against finance-shaped data.</div></div>
+<div style="border:1px dashed var(--border-strong);border-radius:var(--r-lg);background:var(--bg-panel);padding:18px 20px"><div style="font-weight:600;color:var(--fg-strong);font-size:15px;margin-bottom:4px">Third-party red team</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Today the case authors and the code authors are the same people; external adversarial testing closes that gap.</div></div>
+<div style="border:1px dashed var(--border-strong);border-radius:var(--r-lg);background:var(--bg-panel);padding:18px 20px"><div style="font-weight:600;color:var(--fg-strong);font-size:15px;margin-bottom:4px">Independent issuer (SSO/IdP)</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">The live deployment is single-issuer (issuer = deployer, same box); wiring a real SSO validates multi-issuer and rotation discipline.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer style="border-top:1px solid var(--border-subtle);padding:36px 28px;color:var(--fg-faint);font-size:12.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;max-width:1120px;margin:0 auto;box-sizing:border-box">
+  <span style="font-family:var(--font-mono)">mcp-foundry</span>
+  <span style="display:flex;gap:20px;flex-wrap:wrap">
+    <a href="https://github.com/yiongq/mcp-foundry" style="color:var(--fg-muted)">GitHub</a>
+    <a href="https://github.com/yiongq/mcp-foundry/blob/main/docs/eval-methodology.md" style="color:var(--fg-muted)">Eval methodology</a>
+    <a href="https://github.com/yiongq/mcp-foundry/blob/main/DEPLOY-CHECKLIST.md" style="color:var(--fg-muted)">Deploy checklist</a>
+    <a href="/jwks.json" style="color:var(--fg-muted)">JWKS /jwks.json</a>
+  </span>
+</footer>
+</div>
+<script>
+(function () {
+  'use strict';
+  var S = { identity: 'employee', fs: 'sales', lang: 'zh' };
+  try {
+    var saved = localStorage.getItem('foundry-lang');
+    S.lang = saved || ((navigator.language || 'zh').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en');
+  } catch (e) {}
+
+  var TOOLS = [
+    { name: 'list_employees', emp: true }, { name: 'get_employee', emp: true },
+    { name: 'get_leave_balance', emp: true }, { name: 'get_salary', emp: false }
+  ];
+  var TAG = { zh: { on: '可见', off: '不存在' }, en: { on: 'visible', off: 'absent' } };
+  var ANSWER = {
+    zh: {
+      hr:  { label: 'get_salary → 200 OK', text: '张三（e001）当前月薪为 ¥18,500。本次查询已记入审计。' },
+      emp: { label: 'refusal · 结构化拒答分支', text: '你的权限内没有可查询薪资的工具——get_salary 不在我的工具列表里，无法获取该数据。此次请求已记入审计。' }
+    },
+    en: {
+      hr:  { label: 'get_salary → 200 OK', text: 'Zhang San (e001) currently earns ¥18,500/month. This query was logged to audit.' },
+      emp: { label: 'refusal · structured branch', text: "There is no salary tool within your permissions — get_salary isn't in my tool list, so I can't retrieve that data. This request was logged to audit." }
+    }
+  };
+  var BUB = {
+    user: 'align-self:flex-end;background:var(--bg-elev);border-radius:12px 12px 2px 12px;padding:8px 13px;font-size:13px;color:var(--fg);max-width:80%;line-height:1.75;animation:aiIn .3s ease',
+    deny: 'align-self:flex-start;border:1px solid var(--warning-border);background:var(--warning-soft);border-radius:12px 12px 12px 2px;padding:11px 15px;font-size:13px;color:var(--fg);line-height:1.75;max-width:85%;animation:aiIn .3s ease',
+    bot:  'align-self:flex-start;border:1px solid var(--border);background:var(--bg-base);border-radius:12px 12px 12px 2px;padding:11px 15px;font-size:13px;color:var(--fg);line-height:1.75;max-width:85%;animation:aiIn .3s ease'
+  };
+  var TAGSTYLE = 'font-family:var(--font-mono);font-size:11px;color:var(--warning)';
+  var FS = {
+    zh: {
+      hr: [
+        { k: 'user', t: '张三的工资是多少？' },
+        { k: 'bot', t: '张三（e001）当前月薪为 ¥18,500。本次查询已记入审计。' },
+        { k: 'user', t: '顺便看下客户 Acme 的商机进展' },
+        { k: 'deny', tag: 'unknown_role', t: 'CRM 域的 RBAC 里没有你的角色，我没有任何 CRM 工具可用——业务全权 ≠ 跨域全权。此次请求已记入审计。' }
+      ],
+      sales: [
+        { k: 'user', t: '帮我查一下联系人刘明的电话和邮箱' },
+        { k: 'bot', t: '刘明：电话 ', masked: '138****', t2: '（已脱敏），邮箱 ', visible: 'liuming@acme.cn', t3: '（你的权限可见）。' },
+        { k: 'user', t: '王五手上那个大商机进展到哪了？' },
+        { k: 'deny', tag: 'row_denied', t: '这条商机不在你的可见范围内，我拿不到它的数据。此次请求已记入审计。' }
+      ]
+    },
+    en: {
+      hr: [
+        { k: 'user', t: "What is Zhang San's salary?" },
+        { k: 'bot', t: 'Zhang San (e001) currently earns ¥18,500/month. This query was logged to audit.' },
+        { k: 'user', t: "Also, how's the Acme account's pipeline doing?" },
+        { k: 'deny', tag: 'unknown_role', t: "Your role doesn't exist in the CRM domain's RBAC — I have no CRM tools at all. Domain power doesn't travel. Logged to audit." }
+      ],
+      sales: [
+        { k: 'user', t: "Get me contact Liu Ming's phone and email" },
+        { k: 'bot', t: 'Liu Ming: phone ', masked: '138****', t2: ' (masked), email ', visible: 'liuming@acme.cn', t3: ' (visible to your role).' },
+        { k: 'user', t: "How's that big deal of Wang Wu's going?" },
+        { k: 'deny', tag: 'row_denied', t: "That opportunity isn't within your visibility — I can't retrieve its data. Logged to audit." }
+      ]
+    }
+  };
+
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+  function renderTools() {
+    var isHr = S.identity === 'hr';
+    document.querySelectorAll('[data-tools]').forEach(function (box) {
+      var lang = box.getAttribute('data-tools');
+      box.innerHTML = TOOLS.map(function (t) {
+        var vis = t.emp || isHr;
+        var row = 'display:flex;align-items:center;justify-content:space-between;border:1px solid ' +
+          (vis ? 'var(--border)' : 'transparent') + ';border-radius:var(--r-sm);padding:7px 11px;color:' +
+          (vis ? 'var(--fg)' : 'var(--fg-faint)') + ';background:' + (vis ? 'var(--bg-panel)' : 'transparent') +
+          (vis ? '' : ';opacity:.45;text-decoration:line-through');
+        return '<div style="' + row + '"><span style="font-family:var(--font-mono);font-size:12.5px">' + t.name +
+          '</span><span style="font-size:10.5px">' + TAG[lang][vis ? 'on' : 'off'] + '</span></div>';
+      }).join('');
+    });
+    document.querySelectorAll('[data-answer]').forEach(function (box) {
+      var lang = box.getAttribute('data-answer');
+      var a = ANSWER[lang][isHr ? 'hr' : 'emp'];
+      box.setAttribute('style', 'align-self:flex-start;max-width:78%;border-radius:var(--r-md);padding:13px 17px;animation:aiIn .3s ease;border:1px solid ' +
+        (isHr ? 'var(--success)' : 'var(--warning-border)') + ';background:' + (isHr ? 'var(--success-soft)' : 'var(--warning-soft)') + ';color:var(--fg)');
+      box.querySelector('[data-al]').textContent = a.label;
+      box.querySelector('[data-at]').textContent = a.text;
+    });
+    document.querySelectorAll('[data-demo]').forEach(function (b) {
+      b.classList.toggle('active', (b.getAttribute('data-demo') === 'hr') === isHr);
+    });
+  }
+
+  function renderFs() {
+    document.querySelectorAll('[data-fs]').forEach(function (box) {
+      var lang = box.getAttribute('data-fs');
+      box.innerHTML = FS[lang][S.fs].map(function (m) {
+        var inner = '';
+        if (m.tag) inner += '<span style="' + TAGSTYLE + '">' + m.tag + ' — </span>';
+        inner += esc(m.t);
+        if (m.masked) {
+          inner += '<span style="font-family:var(--font-mono);color:var(--danger)">' + m.masked + '</span>' + esc(m.t2) +
+                   '<span style="font-family:var(--font-mono);color:var(--success)">' + m.visible + '</span>' + esc(m.t3);
+        }
+        return '<div style="' + BUB[m.k] + '">' + inner + '</div>';
+      }).join('');
+    });
+    document.querySelectorAll('[data-fsid]').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-fsid') === S.fs);
+    });
+  }
+
+  function renderLang() {
+    var zh = S.lang === 'zh';
+    document.getElementById('page-zh').hidden = !zh;
+    document.getElementById('page-en').hidden = zh;
+    document.documentElement.setAttribute('lang', zh ? 'zh-CN' : 'en');
+    document.title = zh ? 'mcp-foundry — 守卫型 MCP 网关' : 'mcp-foundry — Guarded MCP Gateway';
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-demo],[data-fsid],[data-setlang]');
+    if (!t) return;
+    if (t.hasAttribute('data-demo')) { S.identity = t.getAttribute('data-demo'); renderTools(); }
+    else if (t.hasAttribute('data-fsid')) { S.fs = t.getAttribute('data-fsid'); renderFs(); }
+    else {
+      S.lang = t.getAttribute('data-setlang');
+      try { localStorage.setItem('foundry-lang', S.lang); } catch (err) {}
+      renderLang();
+    }
+  });
+
+  renderLang(); renderTools(); renderFs();
+})();
+</script>
+</body>
+</html>

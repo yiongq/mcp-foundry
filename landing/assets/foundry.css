@@ -1,0 +1,83 @@
+/* mcp-foundry landing — compiled from Claude Design "Foundry Landing.dc.html"
+   Design system: ai-edge (tokens verbatim; fonts local, OFL-1.1). */
+
+/* ---- fonts ---- */
+@font-face { font-family: 'Geist'; src: url('./fonts/Geist-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Geist'; src: url('./fonts/Geist-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Geist'; src: url('./fonts/Geist-SemiBold.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Geist'; src: url('./fonts/Geist-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Geist Mono'; src: url('./fonts/GeistMono-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Geist Mono'; src: url('./fonts/GeistMono-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+
+/* ---- ai-edge tokens (dark + sage pinned by <html data-theme data-accent>) ---- */
+:root {
+  --font-sans: "Geist", "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --fs-xs: 12px; --fs-sm: 13.5px; --fs-base: 14.5px; --fs-md: 16px; --fs-lg: 18px; --fs-xl: 20px;
+  --r-xs: 4px; --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-xl: 16px;
+  --duration: 180ms; --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --bg-base: #faf9f5; --bg-panel: #fdfcf8; --bg-elev: #f0eee6; --bg-sunken: #e9e6dc; --bg-overlay: rgba(38,36,32,.4);
+  --border: #e4e0d5; --border-strong: #d0cbbd; --border-subtle: #efece3;
+  --fg: #262420; --fg-strong: #161512; --fg-muted: #6e6a60; --fg-faint: #6d685e; --fg-on-accent: #fff;
+  --success: #58745f; --success-soft: #e7ede6; --warning: #84601f; --warning-soft: #f4ecda; --warning-border: #e0d3ac; --danger: #ab4439;
+  --shadow-sm: 0 1px 2px rgba(26,24,23,.04), 0 1px 1px rgba(26,24,23,.03);
+  --shadow-lg: 0 12px 32px rgba(26,24,23,.12), 0 2px 8px rgba(26,24,23,.06);
+}
+[data-theme="dark"] {
+  --bg-base: #1f1e1b; --bg-panel: #262624; --bg-elev: #30302d; --bg-sunken: #191815; --bg-overlay: rgba(0,0,0,.6);
+  --border: #3a3935; --border-strong: #4c4a44; --border-subtle: #2e2d2a;
+  --fg: #ece9e1; --fg-strong: #faf9f5; --fg-muted: #a6a196; --fg-faint: #9e988e; --fg-on-accent: #fff;
+  --success: #8fae93; --success-soft: #27302a; --warning: #cfa45e; --warning-soft: #2e2819; --warning-border: #4c3f22; --danger: #d97a7a;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,.5);
+}
+[data-accent="sage"] { --accent: #6e8c6a; --accent-hover: #5c7a58; --accent-soft: #e8eee4; --accent-soft-border: #c6d4c0; --accent-text: #46603f; }
+[data-theme="dark"][data-accent="sage"] { --accent: #8fae8a; --accent-hover: #7e9d79; --accent-soft: #242c21; --accent-soft-border: #3c4a38; --accent-text: #b5cdb0; }
+
+/* ---- base ---- */
+* { box-sizing: border-box; }
+html { background: #1f1e1b; scroll-behavior: smooth; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg-base); color: var(--fg);
+  font-family: var(--font-sans); font-size: 16px; line-height: 1.7;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent-text); text-decoration: none; }
+a:hover { color: var(--accent); }
+a, button { transition: color var(--duration) var(--ease), background-color var(--duration) var(--ease), border-color var(--duration) var(--ease), transform 140ms var(--ease); }
+:where(button, [role="button"], a, textarea, select, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+}
+@keyframes aiIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ---- compiled interaction classes ---- */
+.nl { color: var(--fg-muted); }
+.nl:hover { color: var(--fg); }
+.btn-a:hover { background: var(--accent-hover) !important; color: var(--fg-on-accent); transform: translateY(-1px); }
+.btn-b:hover { background: var(--bg-elev); color: var(--fg); }
+.langbtn { border: 0; background: transparent; cursor: pointer; font-family: var(--font-mono); font-size: 12px; color: var(--fg-faint); padding: 2px 4px; }
+.seg { font-family: var(--font-mono); font-size: 12px; padding: 6px 13px; border-radius: var(--r-sm); cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--fg-muted); }
+.seg.active { border-color: var(--accent-soft-border); background: var(--accent-soft); color: var(--accent-text); }
+
+/* ---- responsive (inline design styles overridden at breakpoints) ---- */
+@media (max-width: 960px) {
+  .grid-2 { grid-template-columns: 1fr !important; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 760px) {
+  .grid-3 { grid-template-columns: 1fr !important; }
+  .nav-links { display: none !important; }
+  .demo-grid { grid-template-columns: 1fr !important; }
+  .demo-grid > div:first-child { border-right: 0 !important; border-bottom: 1px solid var(--border-subtle); }
+}
+@media (max-width: 560px) {
+  .grid-4 { grid-template-columns: 1fr !important; }
+  .grid-2s { grid-template-columns: 1fr !important; }
+  .abl-row { grid-template-columns: 108px 1fr 52px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

@@ -208,3 +208,31 @@ hr_admin 返回真数字（18500 CNY）。
 的 keys（新旧并存过渡，Foundry 按 mtime... 实为 URL 轮询热更新，≤ 刷新间隔生效）→
 用新私钥重签令牌、更新 Dify header → 过渡期结束删旧 JWK 即吊销旧 kid。私钥落盘 0600、
 `.key/.pem` 已被 .gitignore；令牌明文只存本机 `~/.config/mcp-foundry/`（600），不进仓库。
+
+## 12. 落地页（根路径 GET 给人看，/mcp 仍只给机器）
+
+`landing/index.html` 是自包含静态页（无外部依赖），rsync 会随代码一起上去
+（§1 的排除项不匹配它）。改动只在 Caddy：把 foundry 站点的兜底 handle 从
+「反代一切」改成 file_server，**同时给 /mcp 和 /healthz 显式保留反代**
+（smoke.sh 两个都要打；handle 按路径最长前缀优先，顺序无所谓但都得在）：
+
+```bash
+# Caddyfile 的 foundry 块改成（/jwks.json 块保持原样不动）：
+#   foundry.yiongspace.com {
+#       handle /jwks.json { root * /opt/foundry-keys; file_server }
+#       handle /mcp*      { reverse_proxy 127.0.0.1:3100 }
+#       handle /healthz   { reverse_proxy 127.0.0.1:3100 }
+#       handle            { root * /opt/mcp-foundry/landing; file_server }
+#   }
+caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
+
+# 验收三针：
+curl -s https://foundry.yiongspace.com/ | grep -q '同一个网关' && echo landing-ok
+curl -s https://foundry.yiongspace.com/jwks.json | head -1     # 公钥集仍公网可取
+BASE=https://foundry.yiongspace.com \
+FOUNDRY_IDENTITY_KEY=~/.config/mcp-foundry/identity-es256.key \
+FOUNDRY_IDENTITY_KID=2026-07-vps bash smoke.sh                 # 五针仍全绿
+```
+
+改完后浏览器打开 `foundry.yiongspace.com` 是产品落地页，不再是
+`only POST /mcp is served` 的 JSON-RPC 报错；`POST /mcp` 行为不变。
