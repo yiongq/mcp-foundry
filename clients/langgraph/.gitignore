@@ -1,0 +1,13 @@
+# Python 虚拟环境与缓存——本地装的依赖（langgraph 等），绝不进仓库
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# 密钥只在本地
+.env
+
+# 浏览器验证产物
+.playwright-mcp/
+*.png

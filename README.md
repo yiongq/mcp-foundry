@@ -32,10 +32,12 @@ CRM 域开放写工具后补上第四道：**高危写操作人工审批（Human
 ## 架构
 
 ```
-入口层（二选一，身份都透传给同一套守卫）
+入口层（多入口，身份都透传给同一套守卫——守卫做在基础设施层，与 agent 框架无关）
   ├─ MCP 客户端（Claude Code / Dify / 任意 Streamable HTTP host）
   │    POST /mcp，身份：Bearer 签名令牌（生产）或 x-foundry-* 头（demo）
   │    → packages/server（@yiong/foundry-server，无状态）
+  ├─ LangGraph 客户端（clients/langgraph，Python + FastAPI，自建流式前端）
+  │    langchain-mcp-adapters 连同一条 /mcp；对话内审批卡片、批准后自动续跑
   └─ 飞书 bot（packages/feishu，长连接，无需公网回调）
        sender open_id → config/identity.feishu.yaml 映射 → principal
        → GLM tool-calling 循环（自然语言进、按身份收窄的工具面出）
