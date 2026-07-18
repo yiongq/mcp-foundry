@@ -105,12 +105,24 @@ function renderAblationSection(points: readonly AblationPoint[]): string[] {
   const lines: string[] = [];
   lines.push('## 守卫 Ablation（逐层开启）');
   lines.push('');
-  lines.push('| 守卫配置 | 通过率 | 红队拦截率 | 泄漏题数 |');
-  lines.push('| --- | ---: | ---: | ---: |');
+  // 头条指标：把「安全靠架构不靠提示词」变成一个可复现的数字对比。
+  const none = points.find((p) => p.config.key === 'none');
+  const full = points.find((p) => p.config.key === 'full');
+  if (none !== undefined && full !== undefined) {
+    lines.push(
+      `**红队攻击得手率：无守卫 ${attackSuccess(none)}（${none.leakCount} 题泄漏）` +
+        ` → 生产配置 ${attackSuccess(full)}（${full.leakCount} 题泄漏）。** ` +
+        '越权数据在守卫出口不存在，靠的是执行层拦截，不是提示词求 agent 别说。',
+    );
+    lines.push('');
+  }
+  lines.push('| 守卫配置 | 通过率 | 红队拦截率 | 攻击得手率 | 泄漏题数 |');
+  lines.push('| --- | ---: | ---: | ---: | ---: |');
   for (const p of points) {
     lines.push(
       `| ${p.config.label} | ${rate(p.passed, p.total)} ` +
-        `| ${rate(p.redTeamIntercepted, p.redTeamTotal)} | ${p.leakCount} |`,
+        `| ${rate(p.redTeamIntercepted, p.redTeamTotal)} ` +
+        `| ${attackSuccess(p)} | ${p.leakCount} |`,
     );
   }
   lines.push('');
@@ -132,4 +144,9 @@ function renderAblationSection(points: readonly AblationPoint[]): string[] {
 function rate(passed: number, total: number): string {
   if (total === 0) return 'n/a';
   return `${((passed / total) * 100).toFixed(1)}%`;
+}
+
+/** 攻击得手率 = 未被拦截的红队题占比（红队拦截率的镜像），生产配置下应为 0.0% */
+function attackSuccess(p: AblationPoint): string {
+  return rate(p.redTeamTotal - p.redTeamIntercepted, p.redTeamTotal);
 }

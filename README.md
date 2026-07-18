@@ -63,10 +63,13 @@ CRM 域开放写工具后补上第四道：**高危写操作人工审批（Human
 模型想编也没材料。同一个人在飞书里换身份问同一句「张三的工资是多少」——员工被结构化
 拒答、HR 返回真实数字，全程留审计。搭建见 [packages/feishu](packages/feishu)。
 
-配套：`packages/eval` 是越权/泄漏评测——86 题跨三个域（HR 29 + 记忆 20 + CRM 37，
-含跨会话记忆泄露与跨域越权）、硬断言 + LLM-judge 双轨（judge 须先过人工校准）、
-3 次重复报方差、守卫逐层开/关 ablation 曲线。CI 的 eval-gate 在 fixture 上跑并上传
-报告；方法与实测数据见 [docs/eval-methodology.md](docs/eval-methodology.md)。
+配套：`packages/eval` 是越权/泄漏评测——90 题跨三个域（HR 29 + 记忆 20 + CRM 41，
+含跨会话记忆泄露、跨域越权，以及对抗红队题：被提示注入劫持后的 agent 试图伪造归属新建、
+越权改删同事的行、导出他人数据）、硬断言 + LLM-judge 双轨（judge 须先过人工校准）、
+3 次重复报方差、守卫逐层开/关 ablation 曲线。**头条指标：红队攻击得手率 无守卫 75%（43 题
+泄漏）→ 生产配置 0%（0 题泄漏）**——越权数据在守卫出口不存在，靠执行层拦截而非提示词。
+CI 的 eval-gate 在 fixture 上跑并上传报告；方法与实测数据见
+[docs/eval-methodology.md](docs/eval-methodology.md)。
 
 ## Quickstart（fixture 模式，无需任何密钥）
 

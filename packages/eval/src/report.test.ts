@@ -114,6 +114,9 @@ describe('renderReport', () => {
     expect(md).toContain('全关（无守卫）');
     expect(md).toContain('| 全开（生产配置） |');
     expect(md).toContain('红队拦截率曲线');
+    // 头条指标：攻击得手率镜像列 + 无守卫→生产配置的对比句
+    expect(md).toContain('攻击得手率');
+    expect(md).toContain('**红队攻击得手率：无守卫');
 
     expect(md).toMatchSnapshot();
   });
