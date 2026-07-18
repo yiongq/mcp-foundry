@@ -59,7 +59,7 @@ CRM 域开放写工具后补上第四道：**高危写操作人工审批（Human
                    ▼
 ┌────────────────────────────────────────────┐
 │ SystemAdapter：orangehrm（HR）              │    ERP …（路线图，今天没有）
-│   fixture / 只读 MySQL（真实 OrangeHRM 5.7） │
+│   fixture（内置演示数据 · 6 人）             │
 │              ：CRM（后端可热切，同工具同守卫）│
 │              ：twenty（CRM）                 │
 │   fixture / REST（真实 Twenty，Bearer API key）│
@@ -72,11 +72,11 @@ CRM 域开放写工具后补上第四道：**高危写操作人工审批（Human
 模型想编也没材料。同一个人在飞书里换身份问同一句「张三的工资是多少」——员工被结构化
 拒答、HR 返回真实数字，全程留审计。搭建见 [packages/feishu](packages/feishu)。
 
-配套：`packages/eval` 是越权/泄漏评测——96 题跨三个域（HR 29 + 记忆 20 + CRM 47，
+配套：`packages/eval` 是越权/泄漏评测——100 题跨三个域（HR 29 + 记忆 20 + CRM 51，
 含跨会话记忆泄露、跨域越权、对抗红队题（被提示注入劫持后的 agent 试图伪造归属新建、
 越权改删同事的行、导出他人数据），以及退款分级题：小额自动 / 超额或频繁退款挂起等批 /
 凭据不符即拒）、硬断言 + LLM-judge 双轨（judge 须先过人工校准）、
-3 次重复报方差、守卫逐层开/关 ablation 曲线。**头条指标：红队攻击得手率 无守卫 75%（46 题
+3 次重复报方差、守卫逐层开/关 ablation 曲线。**头条指标：红队攻击得手率 无守卫 77.2%（47 题
 泄漏）→ 生产配置 0%（0 题泄漏）**——越权数据在守卫出口不存在，靠执行层拦截而非提示词。
 CI 的 eval-gate 在 fixture 上跑并上传报告；方法与实测数据见
 [docs/eval-methodology.md](docs/eval-methodology.md)。
@@ -219,10 +219,10 @@ ETag/If-None-Match，**忽略 Cache-Control**（这是刷新间隔，不是 HTTP
 
 ## 诚实边界
 
-- 两条业务链路都已对真实系统验证：HR 对真实 OrangeHRM 5.7（只读 MySQL、SELECT-only
-  账号，本地 docker），CRM 对真实 Twenty（REST + Bearer API key）。**CRM 这条已上公网**：
-  线上网关连自托管 Twenty 真库，`crm.yiongspace.com` 的对话前端读写的是真实 Twenty 数据。
-  fixture 与真库两种后端跑同一套评测均全绿；「已验证」是演示数据口径、不是生产规模。
+- CRM 域已上公网连真实 Twenty：线上网关连自托管 Twenty 真库，`crm.yiongspace.com` 的对话
+  前端读写的是真实 Twenty 数据。HR 域曾对真实 OrangeHRM 5.7（只读 MySQL、SELECT-only、本地
+  docker）验证过，该真库后端现已移除——生产与评测一律 fixture。「已验证」是演示数据口径、
+  不是生产规模。
 - 演示与评测数据都是演示口径（HR 6 人；CRM 5 客户 / 5 联系人 / 5 商机 / 3 个销售身份），
   非生产数字。
 - 角色不跨域：CRM 域的角色是 sales_rep/sales_manager，HR 域是 employee/hr_admin，
@@ -249,8 +249,8 @@ ETag/If-None-Match，**忽略 Cache-Control**（这是刷新间隔，不是 HTTP
 - **线上演示的身份是"配好的"，不是"登录来的"**：CRM 前端绑死一枚长效令牌，
   访客点开即是该身份，不能自己切换——这演示的是「同一网关、不同身份、行为不同」，
   不是一套面向访客的登录系统。生产接法是网关/SSO 在用户登录后按其真实身份签发令牌。
-- 线上 CRM 域连的是真实 Twenty（REST + Bearer），HR 域线上仍走 fixture——真实
-  OrangeHRM 只读 MySQL 链路只在本地验证过（SELECT-only 账号）。
+- 线上 CRM 域连的是真实 Twenty（REST + Bearer），HR 域一律 fixture——早期对真实
+  OrangeHRM 5.7 的只读 MySQL 链路本地验证过（SELECT-only 账号），该后端现已移除。
 - 演示令牌 TTL 一年（2027-07 到期），现为 ES256（JWKS 模式）。过期后演示会静默失效——
   届时用 mint-token 拿本机私钥重签、更新 LangGraph 客户端 `.env` 的 `FOUNDRY_MCP_TOKEN`
   （步骤见 [DEPLOY-CHECKLIST.md](DEPLOY-CHECKLIST.md) 的「切换到 JWKS / 轮换演示令牌」）。

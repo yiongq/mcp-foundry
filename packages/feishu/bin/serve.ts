@@ -4,14 +4,14 @@
  * 环境变量（缺省从本包 .env 读取，见 .env 注释）：
  *   FEISHU_APP_ID / FEISHU_APP_SECRET      —— 企业自建应用凭据
  *   FOUNDRY_LLM_BASE_URL / _API_KEY / _MODEL —— OpenAI 兼容对话模型
- *   ORANGEHRM_MYSQL_*（可选）              —— 有则 HR 数据走真实 OrangeHRM 只读库，否则 fixture
  *   TWENTY_API_*（可选）                   —— 有则 CRM 数据走真实 Twenty REST（Bearer），否则 fixture
+ *   （HR 域一律 fixture——真库后端已随 OrangeHRM docker 下线移除）
  */
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createMemoryAdapter, MemoryStore } from '@yiong/foundry-adapter-memory';
-import { createOrangeHrmAdapter, mysqlConfigFromEnv } from '@yiong/foundry-adapter-orangehrm';
+import { createOrangeHrmAdapter } from '@yiong/foundry-adapter-orangehrm';
 import { createTwentyAdapter } from '@yiong/foundry-adapter-twenty';
 import { Guard, JsonlApprovalStore, JsonlAuditLogger, loadRbacConfig } from '@yiong/foundry-core';
 import { startBot } from '../src/bot.js';
@@ -89,12 +89,11 @@ const toolset = new GuardedToolset([
 ]);
 
 const boundCount = Object.keys(identityMap).length;
-// 日志与适配器用同一套探测（host+user+password 齐才算真库）——env 不全时适配器
-// 静默回落 fixture，日志绝不能反着说"已连真库"（真机复验的口径就毁在这种误报上）
-const hrMysql = mysqlConfigFromEnv(process.env);
+// HR 域一律 fixture（真库后端已移除）；CRM 探测 env——TWENTY_API_URL 齐才算真库，
+// 否则 fixture，日志绝不能反着说"已连真库"（真机复验的口径就毁在这种误报上）
 const crmDesc = process.env.TWENTY_API_URL ? `twenty REST ${process.env.TWENTY_API_URL}` : 'twenty fixture';
 console.log(
-  `[bot] 身份绑定 ${boundCount} 人；HR 后端：${hrMysql ? `只读 MySQL ${hrMysql.host}:${hrMysql.port}` : 'fixture'}；CRM 后端：${crmDesc}`,
+  `[bot] 身份绑定 ${boundCount} 人；HR 后端：fixture；CRM 后端：${crmDesc}`,
 );
 
 const bot = await startBot({
