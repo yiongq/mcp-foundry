@@ -90,6 +90,14 @@ if (jwksSource) {
 } else if (secret) {
   auth = { mode: 'token', secret };
   identityBanner = 'identity: signed token (Authorization: Bearer …, mint via `pnpm mint-token`)';
+} else if (process.env.FOUNDRY_ENV === 'production' || process.env.NODE_ENV === 'production') {
+  // 生产铁律：绝不落回未签名的 demo 头模式。头模式下 x-foundry-user 可自证任意身份，
+  // 自审批等身份不变量形同虚设（发起人只要「自称」审批人就能批自己的单）。缺签名身份就
+  // 响亮地拒绝启动，而不是打个警告偷偷跑成不安全形态——把「静默不安全」变成「起不来」。
+  throw new Error(
+    '生产环境必须配置签名身份：设 FOUNDRY_IDENTITY_JWKS（推荐 ES256/RS256）或 FOUNDRY_IDENTITY_SECRET（HS256）。' +
+      '未签名的 demo 头模式（x-foundry-user 自证身份）仅供本地开发，拒绝在生产启动。',
+  );
 } else {
   auth = { mode: 'headers' };
   identityBanner = '';
