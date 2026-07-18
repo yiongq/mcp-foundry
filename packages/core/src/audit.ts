@@ -14,6 +14,11 @@ export interface AuditEvent {
   latencyMs: number;
   /** 只记参数摘要不记原文——审计日志本身不能变成第二个泄漏面 */
   argsHash: string;
+  /** 审批决策事件专用：把「谁批准/驳回了哪张高危单」写进签名链，
+   * 让防篡改审计能回答「这笔退款谁批的」，也让审批记录不再只存在未签名的 approvals.jsonl。
+   * 普通操作事件不带这两个字段；canonicalJson 丢弃 undefined，故老记录 hash 不变。 */
+  approvalId?: string;
+  approverId?: string;
 }
 
 export interface AuditLogger {

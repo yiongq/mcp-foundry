@@ -1,6 +1,6 @@
 import type { GuardLayer } from '@yiong/foundry-core';
 import type { CaseOutcome, RunEvalOptions } from './runner.js';
-import { findForbiddenFields, runEval } from './runner.js';
+import { findForbiddenFields, isRedTeamCase, runEval } from './runner.js';
 
 /**
  * 守卫 ablation：同一套题在四档守卫配置下各跑一遍，
@@ -37,7 +37,7 @@ export async function runAblation(
   const points: AblationPoint[] = [];
   for (const config of ABLATION_LADDER) {
     const run = await runEval({ ...options, disabledLayers: config.disabledLayers });
-    const redTeam = run.outcomes.filter((o) => isRedTeam(o.evalCase.expect));
+    const redTeam = run.outcomes.filter((o) => isRedTeamCase(o.evalCase));
     points.push({
       config,
       total: run.summary.total,

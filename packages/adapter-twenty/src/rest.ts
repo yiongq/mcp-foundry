@@ -142,6 +142,29 @@ export class TwentyRestBackend implements TwentyBackend {
   }
 
   /**
+   * 游标翻页拉全量。Twenty REST 列表默认只返一页（约 60 条）——只读第一页会让
+   * refundCountThisMonth 少算月退款数、悄悄绕过「月退款≥2 需审批」的频次闸门，
+   * 也会让 getOrder/listContacts 漏掉后页记录。首页 URL 不带参数（与既有调用/测试桩一致），
+   * 仅当响应带 pageInfo.hasNextPage 时才用 endCursor 续拉；无 pageInfo（单页/测试桩）即一页返回。
+   */
+  private async requestListAll(path: string, key: string): Promise<unknown[]> {
+    const rows: unknown[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < 100; page++) {
+      const sep = path.includes('?') ? '&' : '?';
+      const p =
+        cursor === undefined ? path : `${path}${sep}starting_after=${encodeURIComponent(cursor)}`;
+      const body = await this.request('GET', p);
+      rows.push(...this.unwrapList(body, key));
+      const pageInfo = (body as { pageInfo?: { hasNextPage?: boolean; endCursor?: string } } | null)
+        ?.pageInfo;
+      if (pageInfo?.hasNextPage !== true || typeof pageInfo.endCursor !== 'string') break;
+      cursor = pageInfo.endCursor;
+    }
+    return rows;
+  }
+
+  /**
    * 解开单条包封。GET 单条包在对象名单数键（person/company/opportunity），
    * 但**写操作包在操作名键**下（createPerson/updatePerson/updateOpportunity）——
    * 依次试给定候选键；都不中则退回「data 下唯一的对象值」（generically 兜住任何操作名键），
@@ -203,7 +226,7 @@ export class TwentyRestBackend implements TwentyBackend {
   }
 
   async listAccounts(industry?: string): Promise<AccountRow[]> {
-    const rows = this.unwrapList(await this.request('GET', '/companies'), 'companies').map((r) =>
+    const rows = (await this.requestListAll('/companies', 'companies')).map((r) =>
       this.toAccountDetail(r),
     );
     const filtered = industry === undefined ? rows : rows.filter((a) => a.industry === industry);
@@ -224,9 +247,7 @@ export class TwentyRestBackend implements TwentyBackend {
   }
 
   async listContacts(accountId?: string): Promise<ContactListRow[]> {
-    const rows = this.unwrapList(await this.request('GET', '/people'), 'people').map((r) =>
-      this.toContactRow(r),
-    );
+    const rows = (await this.requestListAll('/people', 'people')).map((r) => this.toContactRow(r));
     const filtered =
       accountId === undefined ? rows : rows.filter((c) => c.account_id === accountId);
     return filtered.map((c) => ({
@@ -247,8 +268,8 @@ export class TwentyRestBackend implements TwentyBackend {
   }
 
   async listOpportunities(stage?: string): Promise<OpportunityRow[]> {
-    const rows = this.unwrapList(await this.request('GET', '/opportunities'), 'opportunities').map(
-      (r) => this.toOpportunityRow(r),
+    const rows = (await this.requestListAll('/opportunities', 'opportunities')).map((r) =>
+      this.toOpportunityRow(r),
     );
     return stage === undefined ? rows : rows.filter((o) => o.stage === stage);
   }
@@ -361,7 +382,7 @@ export class TwentyRestBackend implements TwentyBackend {
   }
 
   async getOrder(orderId: string): Promise<OrderRow | null> {
-    const rows = this.unwrapList(await this.request('GET', '/orders'), 'orders');
+    const rows = await this.requestListAll('/orders', 'orders');
     const match = rows.find((r) => (r as Record<string, unknown>).name === orderId);
     return match === undefined ? null : this.toOrderRow(match);
   }
@@ -389,7 +410,13 @@ export class TwentyRestBackend implements TwentyBackend {
       'createRefund',
       'refund',
     );
-    const rec = (created ?? {}) as Record<string, unknown>;
+    // 打款路径必须 fail-closed：POST /refunds 若返回 404/204（Refund 自定义对象未配置或
+    // 路径改名），request() 会给出 null——此处若不拦，会把「实际没落库的退款」当成功
+    // 回报给调用方、用户与审计。与 createContact 一致：拿不到真实退款实体就抛错，绝不硬报 issued。
+    if (created === null || created === undefined) {
+      throw new Error('退款失败：Twenty 未返回退款实体（Refund 自定义对象可能未配置）');
+    }
+    const rec = created as Record<string, unknown>;
     return {
       refund_id: typeof rec.id === 'string' ? rec.id : code,
       order_id: order.order_id,
@@ -402,7 +429,7 @@ export class TwentyRestBackend implements TwentyBackend {
   }
 
   async refundCountThisMonth(ownerId: string): Promise<number> {
-    const rows = this.unwrapList(await this.request('GET', '/refunds'), 'refunds');
+    const rows = await this.requestListAll('/refunds', 'refunds');
     const now = new Date();
     const since = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     return rows.filter((r) => {

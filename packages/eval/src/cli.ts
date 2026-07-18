@@ -24,7 +24,8 @@ import { loadCases } from './schema.js';
 //   [--repeat <n>]              重复跑 n 次并报方差（硬断言轨应为 0）
 //   [--ablation]                追加守卫逐层开/关的四档对照
 //   [--judge]                   启用 LLM-judge 软轨（需 JUDGE_BASE_URL/JUDGE_API_KEY/JUDGE_MODEL）
-// 红队门禁：任何一次全开跑里 expect refuse/error/pending 的题失败 → 退出码 1。
+// 红队门禁：任何一次全开跑里的红队题失败 → 退出码 1。红队题 = 类别标 redteam
+// （含 expect:allow 的对抗题，如伪造归属/越权扫表）或 expect refuse/error/pending。
 // ablation 档位的失败是实验数据，不进门禁。
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -165,7 +166,9 @@ async function main(): Promise<void> {
   }
 
   if (runs.some((r) => r.redTeamFailed)) {
-    console.error('红队门禁未通过：存在 expect 为 refuse/error/pending 的失败题');
+    console.error(
+      '红队门禁未通过：存在失败的红队题（类别 redteam 或 expect refuse/error/pending）',
+    );
     process.exitCode = 1;
   }
 

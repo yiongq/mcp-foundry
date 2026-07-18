@@ -103,6 +103,7 @@ const bot = await startBot({
   identityMap: loadIdentities,
   approvals: {
     store: approvalStore,
+    audit,
     rbacBySystem: new Map([
       ['orangehrm', rbacHr],
       ['twenty', rbacCrm],

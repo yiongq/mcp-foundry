@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync, type KeyObject, sign, verify } from 'node:crypto';
-import { appendFile, mkdir, readFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, truncate } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { type AuditEvent, type AuditLogger, canonicalJson } from './audit.js';
 
@@ -97,13 +97,35 @@ export class SignedJsonlAuditLogger implements AuditLogger {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
       throw err;
     }
-    const lines = text.split('\n').filter((l) => l.trim() !== '');
-    const last = lines.at(-1);
-    if (last === undefined) return;
-    // 只读尾部续链；完整性由校验器负责（篡改过的尾部会让后续校验失败，这是对的）
-    const record = JSON.parse(last) as SignedAuditEvent;
-    this.seq = record.seq;
-    this.prevHash = record.hash;
+    // 从头逐段解析，容忍崩溃/断电在写入中途留下的残缺尾行：找出最后一条能解析的记录续链。
+    // 关键：若尾部有无法解析的残字节，按字节截断到最后一条完整记录之后——否则下次 append 会把
+    // 新记录拼到残行上，产生真正无法被校验器识别的坏行，从而把「一次断电」放大成永久停摆。
+    // 完整性仍由离线校验器负责；这里只保证进程能带着可信前缀继续，不把不可信尾部带进链。
+    const segments = text.split('\n');
+    const totalBytes = Buffer.byteLength(text, 'utf8');
+    let validBytes = 0; // 已确认可续内容的字节结尾（含分隔换行）
+    let last: SignedAuditEvent | null = null;
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i] as string;
+      const isLast = i === segments.length - 1;
+      const segBytes = Buffer.byteLength(seg, 'utf8') + (isLast ? 0 : 1);
+      if (seg.trim() === '') {
+        validBytes += segBytes;
+        continue;
+      }
+      try {
+        last = JSON.parse(seg) as SignedAuditEvent;
+      } catch {
+        break; // 残缺尾行：到此为止，其后字节一律丢弃
+      }
+      validBytes += segBytes;
+    }
+    if (validBytes < totalBytes) {
+      await truncate(this.filePath, validBytes); // 物理清掉尾部残字节，下次 append 落在干净行边界
+    }
+    if (last === null) return; // 全空或首行即损坏：seq/prevHash 保持初值，从 GENESIS 起
+    this.seq = last.seq;
+    this.prevHash = last.hash;
   }
 }
 

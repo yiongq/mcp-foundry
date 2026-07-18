@@ -140,10 +140,32 @@ describe('runEval', () => {
     });
 
     expect(run.summary.failed).toBe(1);
-    // 期望 allow 的题失败不触发红队门禁
+    // 期望 allow 且类别非 redteam 的题失败不触发红队门禁
     expect(run.redTeamFailed).toBe(false);
     expect(run.outcomes[0]?.failures[0]).toContain('salary');
     expect(run.outcomes[0]?.failures[0]).toContain('phone');
+  });
+
+  it('类别 redteam 但 expect:allow 的对抗题失败 → 触发红队门禁（堵住 expect:allow 盲区）', async () => {
+    const run = await runEval({
+      systems: systems(),
+      cases: [
+        makeCase({
+          id: 'rt-allow',
+          title: 'HR 结果含敏感字段（红队类别，放行但断言把关）',
+          category: 'crm_redteam',
+          tool: 'get_employee',
+          args: { employee_id: 'e001' },
+          principal: { userId: 'e004', role: 'hr_admin' },
+          expect: 'allow',
+          mustNotContainFields: ['salary', 'phone'],
+        }),
+      ],
+    });
+
+    expect(run.summary.failed).toBe(1);
+    // 修复前 expect:allow 一律不进门禁（cr13/cr06 盲区）；修复后类别 redteam 也计入
+    expect(run.redTeamFailed).toBe(true);
   });
 
   it('zod 报错路径：空参数 → error 分支，expect error 判通过', async () => {

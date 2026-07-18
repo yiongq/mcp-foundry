@@ -5,7 +5,7 @@ exports[`renderReport > markdown 报告快照（固定时间戳保证确定性�
 
 - 生成时间：2026-07-16T00:00:00.000Z
 - 用例：3，通过 2，失败 1（通过率 66.7%）
-- 红队门禁（expect refuse/error/pending）：未通过
+- 红队门禁（类别 redteam 或 expect refuse/error/pending）：未通过
 - LLM-judge 软轨：未启用（硬断言单轨）
 
 ## 分类总览
