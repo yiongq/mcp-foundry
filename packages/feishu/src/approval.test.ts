@@ -133,6 +133,26 @@ describe('审批卡片', () => {
     expect(h.sent[0]?.markdown).toContain('不是 twenty 域的审批人');
   });
 
+  it('职责分离：审批人不能批自己发起的单（self-approval 被拦，单据保持 pending）', async () => {
+    const h = makeHarness();
+    // 经理 e005 自己发起的一张单（既是审批人角色又是发起人）
+    const record = await h.store.create({
+      system: 'twenty',
+      tool: 'delete_contact',
+      args: { contact_id: 'c009' },
+      argsHash: 'hself',
+      userId: 'e005',
+      role: 'sales_manager',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+
+    await handleCardAction(h.deps, click(record.id, 'approve', 'ou_manager')); // e005 批 e005
+
+    expect((await h.store.get(record.id))?.status).toBe('pending');
+    expect(h.invoked).toHaveLength(0);
+    expect(h.sent.at(-1)?.markdown).toContain('不能批复自己发起的单');
+  });
+
   it('未绑定身份点按钮：提示绑定，不动单据', async () => {
     const h = makeHarness();
     const record = await seedRecord(h.store);

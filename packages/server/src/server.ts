@@ -217,6 +217,14 @@ export function createFoundryServer(options: FoundryServerOptions): Server {
         });
         return;
       }
+      // 职责分离硬不变式：发起人不得批自己的单——即便他恰好也是审批人角色。
+      // 这是代码级保证，不依赖 RBAC 把发起/审批角色配成不相交。
+      if (record.userId === principal.userId) {
+        sendJson(res, 403, {
+          error: 'self-approval forbidden: the requester cannot approve their own request',
+        });
+        return;
+      }
       if (record.status !== 'pending') {
         sendJson(res, 409, { error: `approval already ${record.status}` });
         return;

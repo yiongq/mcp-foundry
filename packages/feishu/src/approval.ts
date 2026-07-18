@@ -177,6 +177,13 @@ export async function handleCardAction(
     });
     return;
   }
+  // 职责分离硬不变式：发起人不得批自己的单（即便他也是审批人角色）
+  if (record.userId === operator.userId) {
+    await deps.send(evt.chatId, {
+      markdown: `⛔ 不能批复自己发起的单（发起人 ${operator.userId}）——职责分离要求由他人批复。`,
+    });
+    return;
+  }
 
   if (record.status !== 'pending') {
     // 幂等：已被别人（或自己重复）批过，卡片翻到当前状态即可
