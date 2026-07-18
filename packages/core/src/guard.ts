@@ -1,6 +1,12 @@
 import type { ApprovalStore } from './approvals.js';
 import { type AuditLogger, hashArgs } from './audit.js';
-import { type RbacConfig, type RowRule, resolveSelfRef } from './rbac.js';
+import {
+  type RbacConfig,
+  type RowRule,
+  resolveSelfRef,
+  roleHasApprovalRule,
+  roleRequiresApproval,
+} from './rbac.js';
 import type { GuardedResult, Principal, SystemAdapter, ToolCall, ToolSpec } from './types.js';
 
 /** 守卫的三道防线，评测 ablation 按此粒度逐层关闭以量化每层贡献。 */
@@ -126,7 +132,21 @@ export class Guard {
     // 审批闸门：必须在 execute 之前——行级过滤在结果上跑，拦得住泄漏拦不住已发生的写入。
     // 恢复语义是「重试消票」：同一发起人以同参重试，命中已批准的单即放行并消费，
     // 天然适配无状态 HTTP 入口（无需挂起连接），飞书入口的自动续跑也是同一条路。
-    if (!this.disabled.has('rbac') && role !== undefined && role.approval.includes(call.tool)) {
+    // 分级审批：条目可带 when 条件（如退款按金额/频次分档）。需要评估条件时，先取
+    // 适配器的信号并入上下文（ctx = 参数 ∪ 信号），再判本次调用是否触发审批。
+    let needsApproval = false;
+    if (!this.disabled.has('rbac') && role !== undefined && roleHasApprovalRule(role, call.tool)) {
+      let signals: Record<string, number> = {};
+      if (adapter.approvalSignals !== undefined) {
+        try {
+          signals = await adapter.approvalSignals(call, principal);
+        } catch (err) {
+          return done({ kind: 'error', message: normalizeErrorMessage(err) });
+        }
+      }
+      needsApproval = roleRequiresApproval(role, call.tool, { ...call.args, ...signals });
+    }
+    if (needsApproval && role !== undefined) {
       if (!this.approvals) {
         return done({
           kind: 'error',

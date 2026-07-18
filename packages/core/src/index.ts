@@ -11,8 +11,14 @@ export {
 } from './audit-chain.js';
 export type { GuardLayer, GuardOptions } from './guard.js';
 export { Guard, maskFields } from './guard.js';
-export type { RbacConfig, RoleRule, RowRule } from './rbac.js';
-export { loadRbacConfig, resolveSelfRef } from './rbac.js';
+export type { ApprovalCondition, ApprovalEntry, RbacConfig, RoleRule, RowRule } from './rbac.js';
+export {
+  evalApprovalCondition,
+  loadRbacConfig,
+  resolveSelfRef,
+  roleHasApprovalRule,
+  roleRequiresApproval,
+} from './rbac.js';
 export type {
   AdapterResult,
   GuardedResult,

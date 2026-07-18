@@ -51,7 +51,7 @@ async function rpc(method: string, params: unknown, headers: Record<string, stri
 const REP = { 'x-foundry-user': 'e007', 'x-foundry-role': 'sales_rep' };
 
 describe('twenty 写工具挂 MCP（ZodEffects 回归）', () => {
-  it('tools/list 不 500，且 sales_rep 看到 10 个工具（6 读 + 4 写）', async () => {
+  it('tools/list 不 500，且 sales_rep 看到 11 个工具（6 读 + 5 写）', async () => {
     const { status, body } = await rpc('tools/list', {}, REP);
     expect(status).toBe(200);
     const tools = (body.result as { tools: Array<{ name: string }> }).tools;
@@ -60,8 +60,9 @@ describe('twenty 写工具挂 MCP（ZodEffects 回归）', () => {
     expect(names).toContain('delete_contact');
     expect(names).toContain('create_contact');
     expect(names).toContain('update_opportunity_stage');
+    expect(names).toContain('issue_refund');
     expect(names).toContain('list_contacts');
-    expect(names).toHaveLength(10); // get_pipeline_summary 不在 sales_rep 白名单
+    expect(names).toHaveLength(11); // get_pipeline_summary 不在 sales_rep 白名单
   });
 
   it('tools/call update_contact 不 500——涉审工具返回 pending（而非注册期崩溃）', async () => {

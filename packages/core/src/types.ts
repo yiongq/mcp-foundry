@@ -36,6 +36,13 @@ export interface SystemAdapter {
    * 不实现此方法 = 该系统没有需要前置归属校验的写工具。
    */
   preimage?(call: ToolCall): Promise<unknown>;
+  /**
+   * 可选：为分级审批提供「参数之外」的信号（如"本月已退款几笔"）。
+   * 守卫把返回值并入审批条件的求值上下文（ctx = 调用参数 ∪ 信号），
+   * 于是 rbac 里的 `when: { field: refundCountThisMonth, gte: 2 }` 能引用它。
+   * 无此方法或返回空 = 分级只看调用参数本身。
+   */
+  approvalSignals?(call: ToolCall, principal: Principal): Promise<Record<string, number>>;
 }
 
 export interface AdapterResult {

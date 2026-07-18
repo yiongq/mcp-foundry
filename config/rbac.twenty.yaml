@@ -15,12 +15,23 @@ roles:
         update_contact,
         delete_contact,
         update_opportunity_stage,
+        issue_refund,
       ]
     rows:
       - field: owner_id
         equals: $self.userId
     mask: [phone]
-    approval: [update_contact, delete_contact, update_opportunity_stage]
+    # 改/删/改阶段：一律涉审。退款：分级放行（policy-as-code）——
+    # 金额 > 500 或本月已退 ≥ 2 笔（这是第 3 笔起）即需经理批，否则小额自动放行。
+    approval:
+      - update_contact
+      - delete_contact
+      - update_opportunity_stage
+      - tool: issue_refund
+        when:
+          anyOf:
+            - { field: amount, gt: 500 }
+            - { field: refundCountThisMonth, gte: 2 }
   sales_manager:
     tools: "*"
     approver: true

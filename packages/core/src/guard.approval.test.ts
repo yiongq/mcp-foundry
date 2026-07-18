@@ -6,7 +6,12 @@ import { z } from 'zod';
 import { JsonlApprovalStore, MemoryApprovalStore } from './approvals.js';
 import { MemoryAuditLogger } from './audit.js';
 import { Guard } from './guard.js';
-import { loadRbacConfig } from './rbac.js';
+import {
+  evalApprovalCondition,
+  loadRbacConfig,
+  roleHasApprovalRule,
+  roleRequiresApproval,
+} from './rbac.js';
 import type { Principal, SystemAdapter } from './types.js';
 
 const rbac = loadRbacConfig(`
@@ -264,5 +269,156 @@ describe('审批闸门', () => {
     await expect(store.decide(record.id, 'denied', 'boss')).rejects.toThrow('不能重复批复');
     await store.consume(record.id);
     await expect(store.consume(record.id)).rejects.toThrow('已被消费');
+  });
+});
+
+// ── 分级审批（条件式 policy-as-code）───────────────────────────────────────
+const gradedRbac = loadRbacConfig(`
+roles:
+  sales_rep:
+    tools: [issue_refund]
+    approval:
+      - tool: issue_refund
+        when:
+          anyOf:
+            - { field: amount, gt: 500 }
+            - { field: refundCountThisMonth, gte: 2 }
+  sales_manager:
+    tools: "*"
+    approver: true
+`);
+
+/** 带 approvalSignals 的退款适配器；priorCount 模拟「本月已退笔数」信号。 */
+function makeRefundCrm(priorCount = 0): { adapter: SystemAdapter; executed: unknown[] } {
+  const executed: unknown[] = [];
+  const adapter: SystemAdapter = {
+    system: 'fake-crm',
+    tools: () => [{ name: 'issue_refund', description: '退款', inputSchema: z.object({}) }],
+    execute: async (call) => {
+      executed.push(call.args);
+      return { data: { status: 'issued', ...call.args } };
+    },
+    approvalSignals: async () => ({ refundCountThisMonth: priorCount }),
+  };
+  return { adapter, executed };
+}
+
+describe('条件求值 evalApprovalCondition', () => {
+  it('数值比较 gt/gte/lt/lte', () => {
+    expect(evalApprovalCondition({ field: 'amount', gt: 500 }, { amount: 600 })).toBe(true);
+    expect(evalApprovalCondition({ field: 'amount', gt: 500 }, { amount: 500 })).toBe(false);
+    expect(evalApprovalCondition({ field: 'n', gte: 2 }, { n: 2 })).toBe(true);
+    expect(evalApprovalCondition({ field: 'n', lt: 2 }, { n: 1 })).toBe(true);
+    expect(evalApprovalCondition({ field: 'n', lte: 2 }, { n: 3 })).toBe(false);
+  });
+
+  it('anyOf / allOf 组合', () => {
+    const cond = {
+      anyOf: [{ field: 'amount', gt: 500 } as const, { field: 'c', gte: 2 } as const],
+    };
+    expect(evalApprovalCondition(cond, { amount: 100, c: 2 })).toBe(true); // 频次命中
+    expect(evalApprovalCondition(cond, { amount: 800, c: 0 })).toBe(true); // 金额命中
+    expect(evalApprovalCondition(cond, { amount: 100, c: 0 })).toBe(false); // 都不命中
+    const all = { allOf: [{ field: 'a', gt: 1 } as const, { field: 'b', gt: 1 } as const] };
+    expect(evalApprovalCondition(all, { a: 2, b: 2 })).toBe(true);
+    expect(evalApprovalCondition(all, { a: 2, b: 0 })).toBe(false);
+  });
+
+  it('缺失/非数值字段 → true（fail-safe，不静默放行）', () => {
+    expect(evalApprovalCondition({ field: 'amount', gt: 500 }, {})).toBe(true);
+    expect(evalApprovalCondition({ field: 'amount', gt: 500 }, { amount: 'oops' })).toBe(true);
+  });
+});
+
+describe('roleRequiresApproval / roleHasApprovalRule', () => {
+  const role = gradedRbac.roles.sales_rep;
+  it('纯工具名条目一律涉审；无条目的工具不涉审', () => {
+    const plain = loadRbacConfig(`
+roles:
+  r:
+    tools: [x, y]
+    approval: [x]
+`).roles.r;
+    if (!plain) throw new Error('role r 缺失');
+    expect(roleRequiresApproval(plain, 'x', {})).toBe(true);
+    expect(roleRequiresApproval(plain, 'y', {})).toBe(false);
+  });
+  it('条件条目按 ctx 求值', () => {
+    if (!role) throw new Error('sales_rep 缺失');
+    expect(roleHasApprovalRule(role, 'issue_refund')).toBe(true);
+    expect(
+      roleRequiresApproval(role, 'issue_refund', { amount: 200, refundCountThisMonth: 0 }),
+    ).toBe(false);
+    expect(
+      roleRequiresApproval(role, 'issue_refund', { amount: 8000, refundCountThisMonth: 0 }),
+    ).toBe(true);
+    expect(
+      roleRequiresApproval(role, 'issue_refund', { amount: 100, refundCountThisMonth: 2 }),
+    ).toBe(true);
+  });
+});
+
+describe('分级审批闸门（守卫端到端）', () => {
+  it('小额退款 → 自动放行执行（金额与频次都未触发）', async () => {
+    const { adapter, executed } = makeRefundCrm(0);
+    const guard = new Guard(gradedRbac, new MemoryAuditLogger(), {
+      approvals: new MemoryApprovalStore(),
+    });
+    const result = await guard.invoke(adapter, REP, {
+      tool: 'issue_refund',
+      args: { amount: 200 },
+    });
+    expect(result.kind).toBe('ok');
+    expect(executed).toHaveLength(1);
+  });
+
+  it('大额退款 → 触发审批 pending，未执行', async () => {
+    const { adapter, executed } = makeRefundCrm(0);
+    const store = new MemoryApprovalStore();
+    const guard = new Guard(gradedRbac, new MemoryAuditLogger(), { approvals: store });
+    const result = await guard.invoke(adapter, REP, {
+      tool: 'issue_refund',
+      args: { amount: 8000 },
+    });
+    expect(result.kind).toBe('pending');
+    expect(executed).toHaveLength(0);
+    expect(await store.listPending()).toHaveLength(1);
+  });
+
+  it('小额但本月已退 ≥2 笔（信号来自 approvalSignals）→ 频次触发审批', async () => {
+    const { adapter, executed } = makeRefundCrm(2);
+    const guard = new Guard(gradedRbac, new MemoryAuditLogger(), {
+      approvals: new MemoryApprovalStore(),
+    });
+    const result = await guard.invoke(adapter, REP, {
+      tool: 'issue_refund',
+      args: { amount: 100 },
+    });
+    expect(result.kind).toBe('pending');
+    expect(executed).toHaveLength(0);
+  });
+
+  it('缺 amount 字段 → fail-safe 触发审批，绝不静默放行', async () => {
+    const { adapter, executed } = makeRefundCrm(0);
+    const guard = new Guard(gradedRbac, new MemoryAuditLogger(), {
+      approvals: new MemoryApprovalStore(),
+    });
+    const result = await guard.invoke(adapter, REP, { tool: 'issue_refund', args: {} });
+    expect(result.kind).toBe('pending');
+    expect(executed).toHaveLength(0);
+  });
+
+  it('免审角色（经理，approval 空）大额退款也直通', async () => {
+    const { adapter, executed } = makeRefundCrm(0);
+    const guard = new Guard(gradedRbac, new MemoryAuditLogger(), {
+      approvals: new MemoryApprovalStore(),
+    });
+    const result = await guard.invoke(
+      adapter,
+      { userId: 'e005', role: 'sales_manager' },
+      { tool: 'issue_refund', args: { amount: 8000 } },
+    );
+    expect(result.kind).toBe('ok');
+    expect(executed).toHaveLength(1);
   });
 });
