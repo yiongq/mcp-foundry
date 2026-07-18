@@ -25,7 +25,6 @@ cp config/identity.feishu.example.yaml config/identity.feishu.yaml   # 先留空
 cp packages/feishu/.env.example packages/feishu/.env                 # 填凭据与模型
 # FEISHU_APP_ID / FEISHU_APP_SECRET
 # FOUNDRY_LLM_BASE_URL / _API_KEY / _MODEL（OpenAI 兼容，如智谱 glm-4.6）
-# ORANGEHRM_MYSQL_*（可选：有则 HR 走真库，否则 fixture）
 # TWENTY_API_*（可选：有则 CRM 走真实 Twenty REST，否则 fixture）
 # 3. 启动（长连接，无需公网回调）
 pnpm --filter @yiong/foundry-feishu serve

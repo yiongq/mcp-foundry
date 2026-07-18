@@ -54,7 +54,7 @@ roles:
 function buildToolset(): GuardedToolset {
   const audit = new MemoryAuditLogger();
   return new GuardedToolset([
-    { adapter: createOrangeHrmAdapter({ env: {} }), guard: new Guard(rbacHr, audit) },
+    { adapter: createOrangeHrmAdapter(), guard: new Guard(rbacHr, audit) },
     { adapter: createTwentyAdapter({ env: {} }), guard: new Guard(rbacCrm, audit) },
     { adapter: createMemoryAdapter(new MemoryStore()), guard: new Guard(rbacMemory, audit) },
   ]);
@@ -157,7 +157,7 @@ describe('GuardedToolset', () => {
     expect(
       () =>
         new GuardedToolset([
-          { adapter: createOrangeHrmAdapter({ env: {} }), guard: new Guard(rbacHr, audit) },
+          { adapter: createOrangeHrmAdapter(), guard: new Guard(rbacHr, audit) },
           { adapter: dup, guard: new Guard(rbacHr, audit) },
         ]),
     ).toThrow(/冲突/);

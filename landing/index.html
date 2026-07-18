@@ -16,9 +16,11 @@
     <span style="display:flex;align-items:center;gap:9px;white-space:nowrap;font-weight:600;font-size:15px;color:var(--fg-strong)"><svg width="20" height="20" viewBox="0 0 32 32" fill="none" style="flex:none" aria-hidden="true"><path d="M16 2 L28 7 V15 C28 23 22.5 28.5 16 30 C9.5 28.5 4 23 4 15 V7 Z" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/><path d="M10.5 16 L14.5 20 L21.5 12" stroke="var(--fg-strong)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>mcp-foundry</span>
     <div class="nav-links" style="display:flex;align-items:center;gap:22px;font-size:13.5px">
       <a href="#caps" class="nl">能力</a>
+      <a href="#approval" class="nl">人工审批</a>
       <a href="#arch" class="nl">架构</a>
       <a href="#feishu" class="nl">飞书机器人</a>
       <a href="#eval" class="nl">评测</a>
+      <a href="#standards" class="nl">标准映射</a>
       <a href="#roadmap" class="nl">路线图</a>
       <a href="https://github.com/yiongq/mcp-foundry" class="nl">GitHub</a>
     </div>
@@ -37,6 +39,17 @@
     <p style="font-size:clamp(17px,2vw,20px);color:var(--fg-muted);margin:22px 0 34px;max-width:720px">角色定工具面、行级过滤、字段脱敏、逐调用审计。不该看到的工具连 tools/list 都不出现——不是模型忍住不说,是数据根本没进上下文。</p>
       </div>
 </header>
+
+<section data-screen-label="Proof" style="padding:0 0 70px">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div class="grid-4" style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);display:grid;grid-template-columns:repeat(4,1fr);overflow:hidden">
+        <div style="padding:22px 24px;border-right:1px solid var(--border-subtle)"><div style="font-family:var(--font-mono);font-size:clamp(19px,2.2vw,27px);font-weight:600;color:var(--accent-text);letter-spacing:-0.01em">4 道控制</div><div style="font-size:12px;color:var(--fg-muted);margin-top:7px;line-height:1.55">工具白名单 · 行级/脱敏 · 人工审批 · 签名审计</div></div>
+        <div style="padding:22px 24px;border-right:1px solid var(--border-subtle)"><div style="font-family:var(--font-mono);font-size:clamp(19px,2.2vw,27px);font-weight:600;color:var(--fg-strong);letter-spacing:-0.01em">100 · 11 类</div><div style="font-size:12px;color:var(--fg-muted);margin-top:7px;line-height:1.55">越权/泄漏评测题 · 跨 3 个域</div></div>
+        <div style="padding:22px 24px;border-right:1px solid var(--border-subtle)"><div style="font-family:var(--font-mono);font-size:clamp(19px,2.2vw,27px);font-weight:600;color:var(--fg-strong);letter-spacing:-0.01em">2 真后端</div><div style="font-size:12px;color:var(--fg-muted);margin-top:7px;line-height:1.55">Twenty 线上 · OrangeHRM 5.7 本地实测</div></div>
+        <div style="padding:22px 24px;border-right:1px solid var(--border-subtle)"><div style="font-family:var(--font-mono);font-size:clamp(19px,2.2vw,27px);font-weight:600;color:var(--fg-strong);letter-spacing:-0.01em">0.00</div><div style="font-size:12px;color:var(--fg-muted);margin-top:7px;line-height:1.55">×3 重复通过率标准差(百分点)· 无摇摆题</div></div>
+    </div>
+  </div>
+</section>
 
 <section id="demo" data-screen-label="对比演示" style="padding:0 0 80px">
   <div style="max-width:1120px;margin:0 auto;padding:0 28px">
@@ -96,7 +109,52 @@
   </div>
 </section>
 
-<section id="arch" data-screen-label="架构" style="padding:80px 0">
+<section id="approval" data-screen-label="人工审批" style="padding:80px 0">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:36px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">人工审批 · Human-in-the-loop</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">动钱、改库这类高危写,先过人的点头</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:720px">行级过滤拦得住泄漏,拦不住已经发生的写。涉审写操作在执行前被挂起成审批单,独立审批人批准后才落库——审批必须在写入之前。</p>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);margin-bottom:14px">Guard 管线 · 审批闸门在 execute 之前</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:26px">
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg-panel)"><span style="font-family:var(--font-mono);font-size:11px;opacity:.6">1</span><span style="font-size:13px">角色查找 → 工具白名单</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-faint)"></span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg-panel)"><span style="font-family:var(--font-mono);font-size:11px;opacity:.6">2</span><span style="font-size:13px">写前归属校验(preimage)</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--danger)">越权即 row_denied</span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-md);border:1px solid var(--warning-border);background:var(--warning-soft)"><span style="font-family:var(--font-mono);font-size:11px;opacity:.6">3</span><span style="font-size:13px">审批闸门</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--warning)">pending · 无 data</span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-md);border:1px solid var(--success);background:var(--success-soft)"><span style="font-family:var(--font-mono);font-size:11px;opacity:.6">4</span><span style="font-size:13px">adapter.execute(人批准后)</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--success)">一单一次</span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg-panel)"><span style="font-family:var(--font-mono);font-size:11px;opacity:.6">5</span><span style="font-size:13px">行级过滤 → 字段脱敏 → 审计</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-faint)"></span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;gap:14px"><div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">01</div><div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">独立审批人,不能自批</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">发起人(sales_rep)与审批人(sales_manager,approver:true)分离;RBAC 只标谁能批(approver:true),而「发起人不能批自己的单」是网关代码级硬校验(userId 比对)。</div></div></div>
+          <div style="display:flex;gap:14px"><div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">02</div><div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">闸门在写入之前</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">挂起发生在 adapter.execute 之前——行级过滤拦得住读的泄漏,拦不住已经落库的写。审批必须在写入发生前。</div></div></div>
+          <div style="display:flex;gap:14px"><div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">03</div><div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">一单一次,防重放</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">批准后同参调用重试即消票执行;审批单一次性核销,重复提交不再触发第二次写入。</div></div></div>
+          <div style="display:flex;gap:14px"><div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">04</div><div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">拒答/挂起分支无 data</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">pending 与 refusal 在类型层就没有 data 字段,结构上不可能夹带业务数据或模型自由文本。</div></div></div>
+        </div>
+      </div>
+      <div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-xl);background:var(--bg-panel);overflow:hidden">
+          <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;gap:9px">
+            <span style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-strong)">issue_refund</span>
+            <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--fg-faint);border:1px solid var(--border);border-radius:var(--r-sm);padding:1px 6px">policy-as-code</span>
+            <span style="margin-left:auto;font-size:11.5px;color:var(--fg-muted)">按金额与账期信号分档</span>
+          </div>
+          <div style="padding:8px">
+            <div style="display:flex;align-items:center;gap:14px;padding:13px 14px"><span style="width:8px;height:8px;border-radius:50%;background:var(--success);flex:none"></span><div style="flex:1;font-size:13px;color:var(--fg);font-family:var(--font-mono)">金额 ≤ ¥500 · 本月 < 2 笔</div><span style="font-size:12px;font-weight:600;color:var(--success);white-space:nowrap">自动放行</span></div>
+            <div style="display:flex;align-items:center;gap:14px;padding:13px 14px"><span style="width:8px;height:8px;border-radius:50%;background:var(--warning);flex:none"></span><div style="flex:1;font-size:13px;color:var(--fg);font-family:var(--font-mono)">金额 > ¥500</div><span style="font-size:12px;font-weight:600;color:var(--warning);white-space:nowrap">挂起等经理批</span></div>
+            <div style="display:flex;align-items:center;gap:14px;padding:13px 14px"><span style="width:8px;height:8px;border-radius:50%;background:var(--warning);flex:none"></span><div style="flex:1;font-size:13px;color:var(--fg);font-family:var(--font-mono)">本月已退 ≥ 2 笔(第 3 笔起)</div><span style="font-size:12px;font-weight:600;color:var(--warning);white-space:nowrap">挂起等经理批</span></div>
+            <div style="display:flex;align-items:center;gap:14px;padding:13px 14px"><span style="width:8px;height:8px;border-radius:50%;background:var(--danger);flex:none"></span><div style="flex:1;font-size:13px;color:var(--fg);font-family:var(--font-mono)">订单号 / 邮箱 / 卡尾号不符</div><span style="font-size:12px;font-weight:600;color:var(--danger);white-space:nowrap">直接拒</span></div>
+          </div>
+          <div style="padding:13px 20px;border-top:1px solid var(--border-subtle);background:var(--bg-base);font-size:12px;color:var(--fg-muted);line-height:1.7">归属约束叠加:只退自己名下订单,越权退款在审批前就 row_denied。金额缺失/非数值一律判「需审批」(fail-closed)。</div>
+        </div>
+        <a href="https://github.com/yiongq/mcp-foundry/blob/main/THREAT_MODEL.md" style="display:inline-block;margin-top:18px;font-family:var(--font-mono);font-size:13px">THREAT_MODEL.md · 逐条威胁→控制映射 →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="arch" data-screen-label="架构" style="padding:80px 0;background:var(--bg-sunken)">
   <div style="max-width:1120px;margin:0 auto;padding:0 28px">
     <div style="margin-bottom:36px">
       <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">架构</div>
@@ -163,7 +221,7 @@ pnpm --filter @yiong/foundry-server serve
   </div>
 </section>
 
-<section id="feishu" data-screen-label="飞书机器人" style="padding:80px 0;background:var(--bg-sunken)">
+<section id="feishu" data-screen-label="飞书机器人" style="padding:80px 0">
   <div style="max-width:1120px;margin:0 auto;padding:0 28px">
     <div style="margin-bottom:36px">
       <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">飞书机器人</div>
@@ -205,42 +263,42 @@ pnpm --filter @yiong/foundry-server serve
   </div>
 </section>
 
-<section id="eval" data-screen-label="评测" style="padding:80px 0">
+<section id="eval" data-screen-label="评测" style="padding:80px 0;background:var(--bg-sunken)">
   <div style="max-width:1120px;margin:0 auto;padding:0 28px">
     <div style="margin-bottom:40px">
       <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">评测</div>
       <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">守卫的价值是分数差,不是一句「我们有 RBAC」</h2>
-      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">96 题越权/泄漏题库跨三个域(含对抗红队与退款分级),硬断言 + LLM-judge 双轨(judge 须先过人工校准,只能加严不能翻案)。头条:<b style="color:var(--fg-strong)">红队攻击得手率 无守卫 75% → 生产配置 0%</b>,所有数据可本机复现。</p>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">100 题越权/泄漏题库跨三个域(含对抗红队与退款分级),硬断言 + LLM-judge 双轨(judge 须先过人工校准,只能加严不能翻案)。头条:<b style="color:var(--fg-strong)">红队攻击得手率 无守卫 77.2% → 生产配置 0%</b>,所有数据可本机复现。</p>
     </div>
     <div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:44px">
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
-        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">96</div>
-        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">题 × 11 类,跨三个域<br>HR 29 · 记忆 20 · CRM 47</div>
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">100</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">题 × 11 类,跨三个域<br>HR 29 · 记忆 20 · CRM 51</div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
         <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">100%</div>
-        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">全开配置全绿<br>fixture 与双真库均通过</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">全开配置全绿<br>fixture 常测 · 真后端曾实测</div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
         <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">0.00</div>
         <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">×3 重复通过率标准差<br>(百分点) · 无摇摆题</div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
-        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">75→0<span style="font-size:18px">%</span></div>
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">77→0<span style="font-size:18px">%</span></div>
         <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">红队攻击得手率<br>无守卫 → 生产配置(0 题泄漏)</div>
       </div>
     </div>
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
       <div>
-        <div style="font-weight:600;color:var(--fg-strong);font-size:16px;margin-bottom:6px">守卫逐层 Ablation(96 题;分层贡献与后端实现无关)</div>
+        <div style="font-weight:600;color:var(--fg-strong);font-size:16px;margin-bottom:6px">守卫逐层 Ablation(100 题;分层贡献与后端实现无关)</div>
         <div style="font-size:13px;color:var(--fg-muted);margin-bottom:20px">同一套题在四档守卫配置下各跑一遍——每一层的贡献是可测的:</div>
         <div style="display:flex;flex-direction:column;gap:13px">
-          <div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">全关（无守卫）</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:46.9%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">46.9%</div></div>
-<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">仅角色+工具白名单</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:62.5%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">62.5%</div></div>
-<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">白名单+行级过滤</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:94.8%;background:color-mix(in oklab, var(--success) 60%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">94.8%</div></div>
+          <div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">全关（无守卫）</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:48.0%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">48.0%</div></div>
+<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">仅角色+工具白名单</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:64.0%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">64.0%</div></div>
+<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">白名单+行级过滤</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:95.0%;background:color-mix(in oklab, var(--success) 60%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">95.0%</div></div>
 <div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">全开（生产配置）</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:100.0%;background:var(--success);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--success)">100.0%</div></div>
         </div>
-        <div style="font-size:12.5px;color:var(--fg-faint);margin-top:16px;line-height:1.75">泄漏题数:46 → 28 → 5 → 0(攻击得手率 75% → 0%)。工具白名单先砍一截(红队拦截 25% → 59.1%);<b style="color:var(--fg-muted)">行级过滤是拦截主力</b>(→ 100%);字段脱敏把「白名单+行级」档残留的 5 条脱敏泄漏清零。</div>
+        <div style="font-size:12.5px;color:var(--fg-faint);margin-top:16px;line-height:1.75">泄漏题数:47 → 28 → 5 → 0(攻击得手率 77.2% → 0%)。工具白名单先砍一截(红队拦截 22.8% → 50.9%);<b style="color:var(--fg-muted)">行级过滤是拦截主力</b>(→ 98.2%);字段脱敏把「白名单+行级」档残留的 5 条脱敏泄漏清零(→ 100%)。</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:20px">
         <div style="display:flex;gap:14px">
@@ -266,6 +324,30 @@ pnpm --filter @yiong/foundry-server serve
   </div>
 </section>
 
+<section id="standards" data-screen-label="标准映射" style="padding:80px 0">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:36px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">标准映射</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">每道控制,对标 2026 的公开威胁框架</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:720px">守卫不试图「检测」提示注入——那是打不赢的仗;它让注入「没有后果」。以下把每道控制映射到 OWASP 与中国 TC260 的逐条编号。</p>
+    </div>
+    <div style="overflow-x:auto">
+      <div style="min-width:640px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);overflow:hidden">
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;padding:12px 22px;border-bottom:1px solid var(--border-subtle);font-family:var(--font-mono);font-size:11px;color:var(--fg-faint);background:var(--bg-base)"><div>控制</div><div>拦住什么攻击</div><div>框架编号</div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">工具白名单</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">越权工具调用(员工查薪资、销售摸全员业绩盘)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">OWASP ASI02</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">LLM06</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">TC260 最小权限</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;background:var(--bg-base);border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">行级过滤</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">越权读取他人的行(投毒备注指示"导出全部联系人")</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">LLM01</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">LLM02</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI02</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">字段脱敏</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">敏感字段泄露(电话、工资整行吐进回答)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">LLM02</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;background:var(--bg-base);border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">写前归属校验</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">越权改删同事的行 / 伪造归属新建(归属由 principal 盖戳)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI03</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">审批闸门</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">高危写未经人批就落库(改/删/改阶段)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI09</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">LLM06</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">TC260 二次确认</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;background:var(--bg-base);border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">分级审批</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">大额 / 频繁退款自动放行("动钱"类动作)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI09</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">TC260 资金二次确认</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">签名令牌</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">冒充身份 · alg:none 降级(不读令牌自述 alg)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI03</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;background:var(--bg-base);border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">签名审计链</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">事后抵赖 / 篡改审计(可选 Ed25519 签名链,公钥离线复核;默认明文 JSONL)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI10 可追溯</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">TC260 全量审计</span></div></div>
+      </div>
+    </div>
+    <p style="font-size:12.5px;color:var(--fg-faint);margin:18px 0 0;line-height:1.8;max-width:900px">框架:OWASP Top 10 for Agentic Apps 2026(ASI02/03/09/10)· OWASP LLM Top 10 2025(LLM01/02/06)· 中国 TC260《AI 智能体安全部署使用指南》(2026-07 生效:最小权限 / 高危操作人工二次确认 / 全量审计)。设计对标 lethal trifecta(Willison)与 Meta「Agents Rule of Two」的 [AB] 档(对外动作前人类校验)。EU AI Act Art.14 高风险人工监督已推迟至 2027–2028,本项目 HITL 只作中期顺风、不宣称现在受其强制。</p>
+  </div>
+</section>
+
 <section id="boundaries" data-screen-label="诚实边界" style="padding:80px 0;background:var(--bg-sunken)">
   <div style="max-width:1120px;margin:0 auto;padding:0 28px">
     <div style="margin-bottom:36px">
@@ -274,7 +356,7 @@ pnpm --filter @yiong/foundry-server serve
       <p style="color:var(--fg-muted);margin:12px 0 0;max-width:640px">安全产品最怕过度承诺。以下边界与 README 保持同步:</p>
     </div>
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px 32px;font-size:13.5px;line-height:1.8;color:var(--fg-muted)">
-      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>两条真库链路都已验证:HR 对真实 OrangeHRM 5.7(只读 MySQL,本地 docker),CRM 对真实 Twenty(REST + Bearer)——都是<b style="color:var(--fg-strong)">演示数据口径</b>,不是生产规模</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>两条真库链路都已验证:HR 对真实 OrangeHRM 5.7(只读 MySQL,本地 docker;docker 已下线,prod 走 fixture),CRM 对真实 Twenty(REST + Bearer,线上)——都是<b style="color:var(--fg-strong)">演示数据口径</b>,不是生产规模</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>线上 CRM 域连的是<b style="color:var(--fg-strong)">真实 Twenty</b>(crm.yiongspace.com 读写真数据);HR 域线上仍走 fixture</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>体验链接的身份是<b style="color:var(--fg-strong)">配好的</b>,不是登录来的——演示「同一网关、不同身份、行为不同」,不是登录系统</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>行级/字段规则只在 Guard 出口生效;绕过 Foundry 直连源系统管不到——源系统凭据只发给 Foundry</span></div>
@@ -303,7 +385,7 @@ pnpm --filter @yiong/foundry-server serve
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">CRM 域（twenty 适配器，已上公网）</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">同一套用例 schema 换适配器即全绿；线上网关连真实 Twenty（REST + Bearer），角色不跨域。</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">签名身份：HS256 → JWKS → URL 拉取</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">线上已切</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">ES256/RS256 多签发方 + 热轮换；线上实例现跑 JWKS URL 模式，私钥永不落服务器。</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">飞书 bot 三域端到端 + LangGraph 公网</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">真实飞书应用实测脱敏/拒答/审计；自建 LangGraph 前端上公网，连真实 Twenty，免注册可试。</div></div></div>
-<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">对抗红队评测 + 攻击得手率指标</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">被劫持的 agent 试图伪造归属/越权改删/导出他人数据——红队攻击得手率 无守卫 75% → 生产配置 0%，由 ablation 跑出。</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">对抗红队评测 + 攻击得手率指标</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">被劫持的 agent 试图伪造归属/越权改删/导出他人数据——红队攻击得手率 无守卫 77.2% → 生产配置 0%，由 ablation 跑出。</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">防篡改审计（Ed25519 签名哈希链）</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">可选开启</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">每条审计带 hash 链 + 签名：改一条断整链、伪造验签不过，校验只需公钥、可离线复核（verify-audit）。</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">退款分级动作 + 威胁模型</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">审批闸门升级为分级放行（policy-as-code）：小额自动、超额/频繁挂起、身份核验前置。控制到 OWASP ASI/LLM + TC260 的逐条映射见 <a href="https://github.com/yiongq/mcp-foundry/blob/main/THREAT_MODEL.md">THREAT_MODEL</a>。</div></div></div>
         </div>
@@ -340,9 +422,11 @@ pnpm --filter @yiong/foundry-server serve
     <span style="display:flex;align-items:center;gap:9px;white-space:nowrap;font-weight:600;font-size:15px;color:var(--fg-strong)"><svg width="20" height="20" viewBox="0 0 32 32" fill="none" style="flex:none" aria-hidden="true"><path d="M16 2 L28 7 V15 C28 23 22.5 28.5 16 30 C9.5 28.5 4 23 4 15 V7 Z" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/><path d="M10.5 16 L14.5 20 L21.5 12" stroke="var(--fg-strong)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>mcp-foundry</span>
     <div class="nav-links" style="display:flex;align-items:center;gap:22px;font-size:13.5px">
       <a href="#caps-en" class="nl">Capabilities</a>
+      <a href="#approval-en" class="nl">Approval</a>
       <a href="#arch-en" class="nl">Architecture</a>
       <a href="#feishu-en" class="nl">Feishu bot</a>
       <a href="#eval-en" class="nl">Evals</a>
+      <a href="#standards-en" class="nl">Standards</a>
       <a href="#roadmap-en" class="nl">Roadmap</a>
       <a href="https://github.com/yiongq/mcp-foundry" class="nl">GitHub</a>
     </div>
@@ -361,6 +445,17 @@ pnpm --filter @yiong/foundry-server serve
     <p style="font-size:clamp(17px,2vw,20px);color:var(--fg-muted);margin:22px 0 34px;max-width:720px">Role-scoped tools, row-level filtering, field masking, per-call audit. Off-limits tools never appear in tools/list at all — it's not the model holding back; the data never enters the context.</p>
       </div>
 </header>
+
+<section data-screen-label="Proof" style="padding:0 0 70px">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div class="grid-4" style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);display:grid;grid-template-columns:repeat(4,1fr);overflow:hidden">
+        <div style="padding:22px 24px;border-right:1px solid var(--border-subtle)"><div style="font-family:var(--font-mono);font-size:clamp(19px,2.2vw,27px);font-weight:600;color:var(--accent-text);letter-spacing:-0.01em">4 controls</div><div style="font-size:12px;color:var(--fg-muted);margin-top:7px;line-height:1.55">whitelist · row/field · human approval · signed audit</div></div>
+        <div style="padding:22px 24px;border-right:1px solid var(--border-subtle)"><div style="font-family:var(--font-mono);font-size:clamp(19px,2.2vw,27px);font-weight:600;color:var(--fg-strong);letter-spacing:-0.01em">100 · 11 cat</div><div style="font-size:12px;color:var(--fg-muted);margin-top:7px;line-height:1.55">leak/privilege eval cases · across 3 domains</div></div>
+        <div style="padding:22px 24px;border-right:1px solid var(--border-subtle)"><div style="font-family:var(--font-mono);font-size:clamp(19px,2.2vw,27px);font-weight:600;color:var(--fg-strong);letter-spacing:-0.01em">2 real backends</div><div style="font-size:12px;color:var(--fg-muted);margin-top:7px;line-height:1.55">Twenty (live) · OrangeHRM 5.7 (local)</div></div>
+        <div style="padding:22px 24px;border-right:1px solid var(--border-subtle)"><div style="font-family:var(--font-mono);font-size:clamp(19px,2.2vw,27px);font-weight:600;color:var(--fg-strong);letter-spacing:-0.01em">0.00</div><div style="font-size:12px;color:var(--fg-muted);margin-top:7px;line-height:1.55">std-dev over ×3 repeats (pts) · no flaky cases</div></div>
+    </div>
+  </div>
+</section>
 
 <section id="demo-en" data-screen-label="Demo EN" style="padding:0 0 80px">
   <div style="max-width:1120px;margin:0 auto;padding:0 28px">
@@ -420,7 +515,52 @@ pnpm --filter @yiong/foundry-server serve
   </div>
 </section>
 
-<section id="arch-en" data-screen-label="Architecture EN" style="padding:80px 0">
+<section id="approval-en" data-screen-label="Approval EN" style="padding:80px 0">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:36px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">Human-in-the-loop</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">Money and mutations wait for a human's nod</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:720px">Row filtering stops leaks, not writes that already happened. Approval-gated writes are suspended as a ticket before execution; only an independent approver's sign-off commits them — approval must precede the write.</p>
+    </div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);margin-bottom:14px">Guard pipeline · the gate sits before execute</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:26px">
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg-panel)"><span style="font-family:var(--font-mono);font-size:11px;opacity:.6">1</span><span style="font-size:13px">role lookup → tool whitelist</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-faint)"></span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg-panel)"><span style="font-family:var(--font-mono);font-size:11px;opacity:.6">2</span><span style="font-size:13px">preimage ownership check</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--danger)">else row_denied</span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-md);border:1px solid var(--warning-border);background:var(--warning-soft)"><span style="font-family:var(--font-mono);font-size:11px;opacity:.6">3</span><span style="font-size:13px">approval gate</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--warning)">pending · no data</span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-md);border:1px solid var(--success);background:var(--success-soft)"><span style="font-family:var(--font-mono);font-size:11px;opacity:.6">4</span><span style="font-size:13px">adapter.execute (after approval)</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--success)">one ticket, once</span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg-panel)"><span style="font-family:var(--font-mono);font-size:11px;opacity:.6">5</span><span style="font-size:13px">row filter → mask → audit</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-faint)"></span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;gap:14px"><div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">01</div><div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">Independent approver, no self-approve</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">The requester (sales_rep) and approver (sales_manager, approver:true) are separate; RBAC only marks who may approve (approver:true); the no-self-approve rule itself is a hardcoded gateway check (userId comparison).</div></div></div>
+          <div style="display:flex;gap:14px"><div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">02</div><div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">The gate sits before the write</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">Suspension happens before adapter.execute — row filtering stops read leaks, not writes already committed. Approval must precede the write.</div></div></div>
+          <div style="display:flex;gap:14px"><div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">03</div><div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">One ticket, once — replay-safe</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">After approval, retrying the same call consumes the ticket and executes; the ticket is single-use, so resubmits never fire a second write.</div></div></div>
+          <div style="display:flex;gap:14px"><div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">04</div><div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">Refusal/pending carry no data</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">pending and refusal branches have no data field at the type level — structurally incapable of smuggling business data or model free-text.</div></div></div>
+        </div>
+      </div>
+      <div>
+        <div style="border:1px solid var(--border);border-radius:var(--r-xl);background:var(--bg-panel);overflow:hidden">
+          <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;gap:9px">
+            <span style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-strong)">issue_refund</span>
+            <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--fg-faint);border:1px solid var(--border);border-radius:var(--r-sm);padding:1px 6px">policy-as-code</span>
+            <span style="margin-left:auto;font-size:11.5px;color:var(--fg-muted)">tiered by amount &amp; account signals</span>
+          </div>
+          <div style="padding:8px">
+            <div style="display:flex;align-items:center;gap:14px;padding:13px 14px"><span style="width:8px;height:8px;border-radius:50%;background:var(--success);flex:none"></span><div style="flex:1;font-size:13px;color:var(--fg);font-family:var(--font-mono)">amount ≤ ¥500 · < 2 this month</div><span style="font-size:12px;font-weight:600;color:var(--success);white-space:nowrap">auto-approve</span></div>
+            <div style="display:flex;align-items:center;gap:14px;padding:13px 14px"><span style="width:8px;height:8px;border-radius:50%;background:var(--warning);flex:none"></span><div style="flex:1;font-size:13px;color:var(--fg);font-family:var(--font-mono)">amount > ¥500</div><span style="font-size:12px;font-weight:600;color:var(--warning);white-space:nowrap">hold for manager</span></div>
+            <div style="display:flex;align-items:center;gap:14px;padding:13px 14px"><span style="width:8px;height:8px;border-radius:50%;background:var(--warning);flex:none"></span><div style="flex:1;font-size:13px;color:var(--fg);font-family:var(--font-mono)">≥ 2 refunds this month (3rd+)</div><span style="font-size:12px;font-weight:600;color:var(--warning);white-space:nowrap">hold for manager</span></div>
+            <div style="display:flex;align-items:center;gap:14px;padding:13px 14px"><span style="width:8px;height:8px;border-radius:50%;background:var(--danger);flex:none"></span><div style="flex:1;font-size:13px;color:var(--fg);font-family:var(--font-mono)">order / email / card tail mismatch</div><span style="font-size:12px;font-weight:600;color:var(--danger);white-space:nowrap">reject</span></div>
+          </div>
+          <div style="padding:13px 20px;border-top:1px solid var(--border-subtle);background:var(--bg-base);font-size:12px;color:var(--fg-muted);line-height:1.7">Ownership stacked on top: refunds only for your own orders — an out-of-scope refund is row_denied before approval. Missing/non-numeric amounts always resolve to "needs approval" (fail-closed).</div>
+        </div>
+        <a href="https://github.com/yiongq/mcp-foundry/blob/main/THREAT_MODEL.md" style="display:inline-block;margin-top:18px;font-family:var(--font-mono);font-size:13px">THREAT_MODEL.md · threat → control map →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="arch-en" data-screen-label="Architecture EN" style="padding:80px 0;background:var(--bg-sunken)">
   <div style="max-width:1120px;margin:0 auto;padding:0 28px">
     <div style="margin-bottom:36px">
       <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">architecture</div>
@@ -487,7 +627,7 @@ pnpm --filter @yiong/foundry-server serve
   </div>
 </section>
 
-<section id="feishu-en" data-screen-label="Feishu EN" style="padding:80px 0;background:var(--bg-sunken)">
+<section id="feishu-en" data-screen-label="Feishu EN" style="padding:80px 0">
   <div style="max-width:1120px;margin:0 auto;padding:0 28px">
     <div style="margin-bottom:36px">
       <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">Feishu bot</div>
@@ -529,42 +669,42 @@ pnpm --filter @yiong/foundry-server serve
   </div>
 </section>
 
-<section id="eval-en" data-screen-label="Evals EN" style="padding:80px 0">
+<section id="eval-en" data-screen-label="Evals EN" style="padding:80px 0;background:var(--bg-sunken)">
   <div style="max-width:1120px;margin:0 auto;padding:0 28px">
     <div style="margin-bottom:40px">
       <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">evals</div>
       <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">A guard's value is a score gap, not "we have RBAC"</h2>
-      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">96 leak/privilege cases across three domains (incl. adversarial red-team + graded refunds); hard assertions + LLM-judge dual track. Headline: <b style="color:var(--fg-strong)">red-team attack success 75% (no guard) → 0% (production)</b>. All numbers reproducible locally.</p>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">100 leak/privilege cases across three domains (incl. adversarial red-team + graded refunds); hard assertions + LLM-judge dual track. Headline: <b style="color:var(--fg-strong)">red-team attack success 77.2% (no guard) → 0% (production)</b>. All numbers reproducible locally.</p>
     </div>
     <div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:44px">
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
-        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">96</div>
-        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">cases × 11 categories, 3 domains<br>HR 29 · memory 20 · CRM 47</div>
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">100</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">cases × 11 categories, 3 domains<br>HR 29 · memory 20 · CRM 51</div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
         <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">100%</div>
-        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">green with guards fully on<br>fixture and both real DBs</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">green with guards fully on<br>fixture (CI) · real backends verified</div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
         <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">0.00</div>
         <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">std-dev over ×3 repeats (pts)<br>no flaky cases</div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
-        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">75→0<span style="font-size:18px">%</span></div>
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">77→0<span style="font-size:18px">%</span></div>
         <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">red-team attack success<br>no guard → production (0 leaks)</div>
       </div>
     </div>
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
       <div>
-        <div style="font-weight:600;color:var(--fg-strong);font-size:16px;margin-bottom:6px">Per-layer guard ablation (96 cases; layer contribution is backend-independent)</div>
+        <div style="font-weight:600;color:var(--fg-strong);font-size:16px;margin-bottom:6px">Per-layer guard ablation (100 cases; layer contribution is backend-independent)</div>
         <div style="font-size:13px;color:var(--fg-muted);margin-bottom:20px">The same suite under four guard configurations — each layer's contribution is measurable:</div>
         <div style="display:flex;flex-direction:column;gap:13px">
-          <div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">all off (no guard)</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:46.9%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">46.9%</div></div>
-<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">role + whitelist only</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:62.5%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">62.5%</div></div>
-<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">+ row filtering</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:94.8%;background:color-mix(in oklab, var(--success) 60%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">94.8%</div></div>
+          <div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">all off (no guard)</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:48.0%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">48.0%</div></div>
+<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">role + whitelist only</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:64.0%;background:color-mix(in oklab, var(--danger) 45%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">64.0%</div></div>
+<div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">+ row filtering</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:95.0%;background:color-mix(in oklab, var(--success) 60%, transparent);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--fg-muted)">95.0%</div></div>
 <div class="abl-row" style="display:grid;grid-template-columns:180px 1fr 60px;gap:12px;align-items:center"><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);text-align:right">all on (production)</div><div style="height:20px;background:var(--bg-elev);border-radius:5px;overflow:hidden"><div style="height:100%;width:100.0%;background:var(--success);border-radius:4px"></div></div><div style="font-family:var(--font-mono);font-size:12.5px;color:var(--success)">100.0%</div></div>
         </div>
-        <div style="font-size:12.5px;color:var(--fg-faint);margin-top:16px;line-height:1.75">Leaks: 46 → 28 → 5 → 0 (attack success 75% → 0%). The whitelist cuts a first slice (red-team block 25% → 59.1%); <b style="color:var(--fg-muted)">row filtering is the main blocker</b> (→ 100%); field masking clears the 5 masking leaks left at "whitelist + rows".</div>
+        <div style="font-size:12.5px;color:var(--fg-faint);margin-top:16px;line-height:1.75">Leaks: 47 → 28 → 5 → 0 (attack success 77.2% → 0%). The whitelist cuts a first slice (red-team block 22.8% → 50.9%); <b style="color:var(--fg-muted)">row filtering is the main blocker</b> (→ 98.2%); field masking clears the 5 masking leaks left at "whitelist + rows" (→ 100%).</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:20px">
         <div style="display:flex;gap:14px">
@@ -590,6 +730,30 @@ pnpm --filter @yiong/foundry-server serve
   </div>
 </section>
 
+<section id="standards-en" data-screen-label="Standards EN" style="padding:80px 0">
+  <div style="max-width:1120px;margin:0 auto;padding:0 28px">
+    <div style="margin-bottom:36px">
+      <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">standards</div>
+      <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">Every control, mapped to 2026's public threat frameworks</h2>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:720px">The guard doesn't try to "detect" prompt injection — an unwinnable fight; it makes injection consequence-free. Each control maps to specific OWASP and China TC260 clauses.</p>
+    </div>
+    <div style="overflow-x:auto">
+      <div style="min-width:640px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);overflow:hidden">
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;padding:12px 22px;border-bottom:1px solid var(--border-subtle);font-family:var(--font-mono);font-size:11px;color:var(--fg-faint);background:var(--bg-base)"><div>control</div><div>what it stops</div><div>frameworks</div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">Tool whitelist</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">Unauthorized tool calls (employee reads salary, sales peeks at the pipeline)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">OWASP ASI02</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">LLM06</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">TC260 least-priv</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;background:var(--bg-base);border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">Row filtering</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">Reading others' rows (poisoned note: "export all contacts")</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">LLM01</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">LLM02</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI02</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">Field masking</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">Sensitive fields leaking (phone/salary rows dumped into answers)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">LLM02</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;background:var(--bg-base);border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">Preimage ownership</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">Editing/deleting a colleague's row / forged-owner create (owner stamped by principal)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI03</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">Approval gate</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">High-risk writes committed without a human (edit/delete/stage)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI09</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">LLM06</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">TC260 2nd-check</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;background:var(--bg-base);border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">Tiered approval</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">Large/frequent refunds auto-approved (money actions)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI09</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">TC260 fund 2nd-check</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">Signed tokens</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">Identity spoofing · alg:none downgrade (token-stated alg is never read)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI03</span></div></div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:0;padding:15px 22px;align-items:start;background:var(--bg-base);border-top:1px solid var(--border-subtle)"><div style="font-weight:600;color:var(--fg-strong);font-size:13.5px;padding-right:12px">Signed audit chain</div><div style="font-size:13px;color:var(--fg-muted);line-height:1.6;padding-right:16px">Repudiation / audit tampering (opt-in Ed25519 signed chain; plaintext JSONL by default)</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start"><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">ASI10 trace</span><span style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent-text);border:1px solid var(--accent-soft-border);background:var(--accent-soft);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap">TC260 full audit</span></div></div>
+      </div>
+    </div>
+    <p style="font-size:12.5px;color:var(--fg-faint);margin:18px 0 0;line-height:1.8;max-width:900px">Frameworks: OWASP Top 10 for Agentic Apps 2026 (ASI02/03/09/10) · OWASP LLM Top 10 2025 (LLM01/02/06) · China TC260 AI-Agent Security Guide (in force 2026-07: least privilege / human 2nd-check for high-risk actions / full audit). Design tracks the lethal trifecta (Willison) and Meta's "Agents Rule of Two" [AB] tier (human validates before outbound actions). EU AI Act Art.14 human oversight is deferred to 2027–2028; this project's HITL is a mid-term tailwind, not claimed as currently mandated.</p>
+  </div>
+</section>
+
 <section id="boundaries-en" data-screen-label="Limits EN" style="padding:80px 0;background:var(--bg-sunken)">
   <div style="max-width:1120px;margin:0 auto;padding:0 28px">
     <div style="margin-bottom:36px">
@@ -598,7 +762,7 @@ pnpm --filter @yiong/foundry-server serve
       <p style="color:var(--fg-muted);margin:12px 0 0;max-width:640px">Overpromising is the worst failure mode for a security product. These limits stay in sync with the README:</p>
     </div>
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px 32px;font-size:13.5px;line-height:1.8;color:var(--fg-muted)">
-      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>both real backends verified: HR against real OrangeHRM 5.7 (read-only MySQL, local docker), CRM against real Twenty (REST + Bearer) — <b style="color:var(--fg-strong)">demo-scale data</b>, not production scale</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>both real backends verified: HR against real OrangeHRM 5.7 (read-only MySQL, local docker; docker retired, prod runs fixture), CRM against real Twenty (REST + Bearer, live) — <b style="color:var(--fg-strong)">demo-scale data</b>, not production scale</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>The live CRM domain runs <b style="color:var(--fg-strong)">real Twenty</b> (crm.yiongspace.com reads/writes real data); the HR domain stays on fixture online</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>Demo identities are <b style="color:var(--fg-strong)">pre-configured</b>, not logged in — it demonstrates "same gateway, different identity, different behavior", not a login system</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>Row/field rules apply only at the guard's exit; bypassing Foundry to hit the source system directly is out of scope — source credentials go to Foundry only</span></div>
@@ -627,7 +791,7 @@ pnpm --filter @yiong/foundry-server serve
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">CRM domain (twenty adapter, now public)</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Same case schema green after just swapping the adapter; the live gateway talks to real Twenty (REST + Bearer). Roles never cross domains.</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Signed identity: HS256 → JWKS → URL fetch</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">live</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">ES256/RS256 multi-issuer with hot rotation; the live instance runs JWKS URL mode — private keys never touch the server.</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Feishu bot ×3 domains + LangGraph public</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Masking / refusals / audit tested on a real Feishu app; a self-built LangGraph frontend is live against real Twenty, no signup.</div></div></div>
-<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Adversarial red-team eval + attack-success metric</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">A hijacked agent attempts forged ownership / cross-owner writes / exfil — red-team attack success 75% (no guard) → 0% (production), measured via ablation.</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Adversarial red-team eval + attack-success metric</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">A hijacked agent attempts forged ownership / cross-owner writes / exfil — red-team attack success 77.2% (no guard) → 0% (production), measured via ablation.</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Tamper-evident audit (Ed25519 hash chain)</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">opt-in</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Each record hash-chained + signed: alter one and the chain breaks, forge one and the signature fails; verification needs only the public key, offline (verify-audit).</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Graded refund action + threat model</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">The approval gate becomes graded (policy-as-code): small auto, large/frequent held, identity check up front. Per-control mapping to OWASP ASI/LLM + TC260 in <a href="https://github.com/yiongq/mcp-foundry/blob/main/THREAT_MODEL.md">THREAT_MODEL</a>.</div></div></div>
         </div>
@@ -692,12 +856,12 @@ pnpm --filter @yiong/foundry-server serve
       hr: [
         { k: 'user', t: '张三的工资是多少？' },
         { k: 'bot', t: '张三（e001）当前月薪为 ¥18,500。本次查询已记入审计。' },
-        { k: 'user', t: '顺便看下客户 Acme 的商机进展' },
+        { k: 'user', t: '顺便看下客户 华胜精密制造 的商机进展' },
         { k: 'deny', tag: 'unknown_role', t: 'CRM 域的 RBAC 里没有你的角色，我没有任何 CRM 工具可用——业务全权 ≠ 跨域全权。此次请求已记入审计。' }
       ],
       sales: [
-        { k: 'user', t: '帮我查一下联系人刘明的电话和邮箱' },
-        { k: 'bot', t: '刘明：电话 ', masked: '138****', t2: '（已脱敏），邮箱 ', visible: 'liuming@acme.cn', t3: '（你的权限可见）。' },
+        { k: 'user', t: '帮我查一下联系人刘敏的电话和邮箱' },
+        { k: 'bot', t: '刘敏：电话 ', masked: '〔出口已剔除〕', t2: '（整字段不返回），邮箱 ', visible: 'liumin@lanchuan.example.com', t3: '（你的权限可见）。' },
         { k: 'user', t: '何静手上那个大商机进展到哪了？' },
         { k: 'deny', tag: 'row_denied', t: '这条商机不在你的可见范围内，我拿不到它的数据。此次请求已记入审计。' }
       ]
@@ -706,13 +870,13 @@ pnpm --filter @yiong/foundry-server serve
       hr: [
         { k: 'user', t: "What is Zhang San's salary?" },
         { k: 'bot', t: 'Zhang San (e001) currently earns ¥18,500/month. This query was logged to audit.' },
-        { k: 'user', t: "Also, how's the Acme account's pipeline doing?" },
+        { k: 'user', t: "Also, how's Huasheng's pipeline doing?" },
         { k: 'deny', tag: 'unknown_role', t: "Your role doesn't exist in the CRM domain's RBAC — I have no CRM tools at all. Domain power doesn't travel. Logged to audit." }
       ],
       sales: [
-        { k: 'user', t: "Get me contact Liu Ming's phone and email" },
-        { k: 'bot', t: 'Liu Ming: phone ', masked: '138****', t2: ' (masked), email ', visible: 'liuming@acme.cn', t3: ' (visible to your role).' },
-        { k: 'user', t: "How's that big deal of Wang Wu's going?" },
+        { k: 'user', t: "Get me contact Liu Min's phone and email" },
+        { k: 'bot', t: 'Liu Min: phone ', masked: '[dropped at egress]', t2: ' (whole field removed), email ', visible: 'liumin@lanchuan.example.com', t3: ' (visible to your role).' },
+        { k: 'user', t: "How's He Jing's big deal going?" },
         { k: 'deny', tag: 'row_denied', t: "That opportunity isn't within your visibility — I can't retrieve its data. Logged to audit." }
       ]
     }

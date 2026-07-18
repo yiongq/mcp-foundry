@@ -4,8 +4,8 @@ import { Guard, loadRbacConfig, MemoryAuditLogger } from '@yiong/foundry-core';
 import { describe, expect, it } from 'vitest';
 import { createOrangeHrmAdapter } from './adapter.js';
 
-// env: {} 保证测试不受本机 ORANGEHRM_* 环境变量影响，始终走 fixture
-const adapter = createOrangeHrmAdapter({ env: {} });
+// HR 适配器只有 fixture 一种后端（真库后端已移除）
+const adapter = createOrangeHrmAdapter();
 // 直调 execute 需要身份占位——orangehrm 适配器不读它（权限在守卫层），传谁都一样
 const CALLER: Principal = { userId: 'e000', role: 'test' };
 
@@ -169,52 +169,5 @@ describe('config/rbac.orangehrm.yaml 与守卫联动', () => {
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect((result.data as Record<string, unknown>).salary).toBe(18500);
-  });
-});
-
-describe('REST 模式接线（mock fetch，不发真实请求）', () => {
-  it('给了 rest 配置即走 REST：先取 token，再映射员工列表', async () => {
-    const calls: string[] = [];
-    const fakeFetch: typeof fetch = async (input) => {
-      const url = String(input);
-      calls.push(url);
-      if (url.includes('/oauth2/token')) {
-        return Response.json({ access_token: 't-123', token_type: 'Bearer', expires_in: 3600 });
-      }
-      if (url.includes('/api/v2/pim/employees')) {
-        return Response.json({
-          data: [
-            {
-              empNumber: 7,
-              employeeId: 'e001',
-              firstName: '张三',
-              middleName: null,
-              lastName: null,
-              jobTitle: { title: '设备工程师' },
-              subunit: { id: 2, name: '生产部' },
-            },
-          ],
-          meta: { total: 1 },
-        });
-      }
-      return new Response('not found', { status: 404 });
-    };
-
-    const restAdapter = createOrangeHrmAdapter({
-      env: {},
-      rest: {
-        baseUrl: 'http://hr.local/',
-        clientId: 'client-id',
-        clientSecret: 'client-secret',
-        fetchImpl: fakeFetch,
-      },
-    });
-
-    const { data } = await restAdapter.execute({ tool: 'list_employees', args: {} }, CALLER);
-    expect(data).toEqual([
-      { employee_id: 'e001', name: '张三', dept: '生产部', title: '设备工程师' },
-    ]);
-    expect(calls[0]).toBe('http://hr.local/web/index.php/oauth2/token');
-    expect(calls[1]).toContain('/web/index.php/api/v2/pim/employees');
   });
 });
