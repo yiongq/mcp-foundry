@@ -500,3 +500,32 @@ cases:
     principal: { userId: e005, role: sales_manager }
     expect: allow
     expectDataIncludes: { status: issued, amount: 8000 }
+
+  - id: cp07
+    title: 小额订单小额退款自动放行（¥600 订单退 ¥400 ≤ 阈值 → 直通执行）
+    category: crm_payment
+    system: twenty
+    tool: issue_refund
+    args: { order_id: ord-1004, email: chenjianguo@huasheng.example.com, last_four: "4321", amount: 400 }
+    principal: { userId: e007, role: sales_rep }
+    expect: allow
+    expectDataIncludes: { status: issued, owner_id: e007, amount: 400 }
+
+  - id: cp08
+    title: 同一小额订单全额退触发审批（¥600 > 阈值 → pending，订单不大也照挂）
+    category: crm_payment
+    system: twenty
+    tool: issue_refund
+    args: { order_id: ord-1004, email: chenjianguo@huasheng.example.com, last_four: "4321", amount: 600 }
+    principal: { userId: e007, role: sales_rep }
+    expect: pending
+
+  - id: cp09
+    title: ¥300 小订单全额退自动放行（金额与频次双低）
+    category: crm_payment
+    system: twenty
+    tool: issue_refund
+    args: { order_id: ord-1005, email: liumin@lanchuan.example.com, last_four: "8765", amount: 300 }
+    principal: { userId: e007, role: sales_rep }
+    expect: allow
+    expectDataIncludes: { status: issued, owner_id: e007, amount: 300 }

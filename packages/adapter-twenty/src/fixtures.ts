@@ -219,6 +219,25 @@ export const FIXTURE_ORDERS: readonly OrderRow[] = [
     currency: CURRENCY,
     owner_id: 'e008',
   },
+  // 小额订单：让退款分级的「小额自动放行」档在数据上直观（同一 ¥600 订单退 ¥400 自动、退 ¥600 挂起）
+  {
+    order_id: 'ord-1004',
+    account_id: 'a001',
+    email: 'chenjianguo@huasheng.example.com',
+    last_four: '4321',
+    amount_paid: 600,
+    currency: CURRENCY,
+    owner_id: 'e007',
+  },
+  {
+    order_id: 'ord-1005',
+    account_id: 'a002',
+    email: 'liumin@lanchuan.example.com',
+    last_four: '8765',
+    amount_paid: 300,
+    currency: CURRENCY,
+    owner_id: 'e007',
+  },
 ];
 
 /**
