@@ -23,9 +23,15 @@ services:
       FOUNDRY_IDENTITY_JWKS: "${FOUNDRY_IDENTITY_JWKS:-}"
       FOUNDRY_IDENTITY_JWKS_REFRESH: "${FOUNDRY_IDENTITY_JWKS_REFRESH:-}"
       FOUNDRY_IDENTITY_JWKS_MAX_STALE: "${FOUNDRY_IDENTITY_JWKS_MAX_STALE:-}"
+      # CRM 后端二选一（缺省 espocrm）。设 twenty 则 CRM 域换 Twenty 适配器，工具/守卫不变。
+      FOUNDRY_CRM_BACKEND: "${FOUNDRY_CRM_BACKEND:-espocrm}"
       # 可选：CRM 写工具走 EspoCRM REST（不设时 fixture 内存写、MySQL 拒写）
       ESPOCRM_REST_URL: "${ESPOCRM_REST_URL:-}"
       ESPOCRM_REST_API_KEY: "${ESPOCRM_REST_API_KEY:-}"
+      # 可选：Twenty 后端走真库 REST（Bearer；不设则 twenty fixture）
+      TWENTY_API_URL: "${TWENTY_API_URL:-}"
+      TWENTY_API_KEY: "${TWENTY_API_KEY:-}"
+      TWENTY_OWNER_FIELD: "${TWENTY_OWNER_FIELD:-}"
     ports:
       - "127.0.0.1:3100:3100"
     volumes:

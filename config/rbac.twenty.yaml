@@ -1,0 +1,26 @@
+# Twenty CRM 演示 RBAC——与 rbac.espocrm.yaml 同角色同规则：
+# 换 CRM 后端不换权限模型，同一批 demo 身份（孙七 sales_rep / 王五 sales_manager）通用。
+# 这正是「守卫与后端无关」的配置层证据。
+roles:
+  sales_rep:
+    tools:
+      [
+        list_accounts,
+        get_account,
+        list_contacts,
+        get_contact,
+        list_opportunities,
+        get_opportunity,
+        create_contact,
+        update_contact,
+        delete_contact,
+        update_opportunity_stage,
+      ]
+    rows:
+      - field: owner_id
+        equals: $self.userId
+    mask: [phone]
+    approval: [update_contact, delete_contact, update_opportunity_stage]
+  sales_manager:
+    tools: "*"
+    approver: true

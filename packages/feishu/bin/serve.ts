@@ -16,6 +16,7 @@ import {
 } from '@yiong/foundry-adapter-espocrm';
 import { createMemoryAdapter, MemoryStore } from '@yiong/foundry-adapter-memory';
 import { createOrangeHrmAdapter, mysqlConfigFromEnv } from '@yiong/foundry-adapter-orangehrm';
+import { createTwentyAdapter } from '@yiong/foundry-adapter-twenty';
 import { Guard, JsonlApprovalStore, JsonlAuditLogger, loadRbacConfig } from '@yiong/foundry-core';
 import { startBot } from '../src/bot.js';
 import { loadIdentityMap } from '../src/identity.js';
@@ -49,8 +50,11 @@ const repoRoot = new URL('../../../', import.meta.url);
 loadDotEnv(new URL('../.env', import.meta.url));
 
 const rbacHr = loadRbacConfig(await readFile(new URL('config/rbac.orangehrm.yaml', repoRoot), 'utf8'));
+// CRM 后端可热切（FOUNDRY_CRM_BACKEND=twenty）——工具/守卫/身份全不变，只换适配器与系统标签
+const crmBackend = process.env.FOUNDRY_CRM_BACKEND === 'twenty' ? 'twenty' : 'espocrm';
+const crmAdapter = crmBackend === 'twenty' ? createTwentyAdapter() : createEspoCrmAdapter();
 const rbacCrm = loadRbacConfig(
-  await readFile(new URL('config/rbac.espocrm.yaml', repoRoot), 'utf8'),
+  await readFile(new URL(`config/rbac.${crmBackend}.yaml`, repoRoot), 'utf8'),
 );
 const rbacMemory = loadRbacConfig(
   await readFile(new URL('config/rbac.memory.yaml', repoRoot), 'utf8'),
@@ -82,7 +86,7 @@ const approvalStore = new JsonlApprovalStore(
 const memoryStore = new MemoryStore();
 const toolset = new GuardedToolset([
   { adapter: createOrangeHrmAdapter(), guard: new Guard(rbacHr, audit, { approvals: approvalStore }) },
-  { adapter: createEspoCrmAdapter(), guard: new Guard(rbacCrm, audit, { approvals: approvalStore }) },
+  { adapter: crmAdapter, guard: new Guard(rbacCrm, audit, { approvals: approvalStore }) },
   {
     adapter: createMemoryAdapter(memoryStore),
     guard: new Guard(rbacMemory, audit, { approvals: approvalStore }),
@@ -93,9 +97,17 @@ const boundCount = Object.keys(identityMap).length;
 // 日志与适配器用同一套探测（host+user+password 齐才算真库）——env 不全时适配器
 // 静默回落 fixture，日志绝不能反着说"已连真库"（真机复验的口径就毁在这种误报上）
 const hrMysql = mysqlConfigFromEnv(process.env);
-const crmMysql = espoMysqlConfigFromEnv(process.env);
+const crmMysql = crmBackend === 'espocrm' ? espoMysqlConfigFromEnv(process.env) : null;
+const crmDesc =
+  crmBackend === 'twenty'
+    ? process.env.TWENTY_API_URL
+      ? `twenty REST ${process.env.TWENTY_API_URL}`
+      : 'twenty fixture'
+    : crmMysql
+      ? `espocrm 只读 MySQL ${crmMysql.host}:${crmMysql.port}`
+      : 'espocrm fixture';
 console.log(
-  `[bot] 身份绑定 ${boundCount} 人；HR 后端：${hrMysql ? `只读 MySQL ${hrMysql.host}:${hrMysql.port}` : 'fixture'}；CRM 后端：${crmMysql ? `只读 MySQL ${crmMysql.host}:${crmMysql.port}` : 'fixture'}`,
+  `[bot] 身份绑定 ${boundCount} 人；HR 后端：${hrMysql ? `只读 MySQL ${hrMysql.host}:${hrMysql.port}` : 'fixture'}；CRM 后端：${crmDesc}`,
 );
 
 const bot = await startBot({
@@ -106,7 +118,7 @@ const bot = await startBot({
     store: approvalStore,
     rbacBySystem: new Map([
       ['orangehrm', rbacHr],
-      ['espocrm', rbacCrm],
+      [crmBackend, rbacCrm], // 系统标签随后端切换（espocrm / twenty）
       ['memory', rbacMemory],
     ]),
     // 不设则审批卡片发到触发对话本身（单人 dogfood 缺省）；设了发到指定会话（审批群）
