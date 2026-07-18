@@ -15,3 +15,7 @@ config/identity.feishu.yaml
 # keygen 强制私钥落到 .key/.pem 扩展名，这两条通配即覆盖全部私钥产物。
 *.key
 *.pem
+
+# 本地验证截图（playwright）
+verify-*.png
+.playwright-mcp/

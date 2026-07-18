@@ -1,0 +1,22 @@
+[project]
+name = "foundry-langgraph-client"
+version = "0.1.0"
+description = "LangGraph client for the mcp-foundry gateway — same gateway, different framework"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# 数据行而非代码：agent 的系统提示词整段 + 测试里的 GuardedResult JSON 夹具，
+# 长度超 100 是内容使然，不硬拆
+"app/agent.py" = ["E501"]
+"tests/**" = ["E501"]
