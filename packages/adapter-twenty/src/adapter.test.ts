@@ -7,7 +7,7 @@ import { createTwentyAdapter } from './adapter.js';
 const adapter = createTwentyAdapter({ env: {} });
 const CALLER: Principal = { userId: 'e000', role: 'test' };
 
-describe('twenty fixture：七读四写（与 espocrm 同形）', () => {
+describe('twenty fixture：七读四写', () => {
   it('tools() 恰好 11 个，名称与顺序稳定', () => {
     expect(adapter.system).toBe('twenty');
     expect(adapter.tools().map((t) => t.name)).toEqual([
@@ -43,7 +43,7 @@ describe('twenty fixture：七读四写（与 espocrm 同形）', () => {
     expect(one).toHaveProperty('phone');
   });
 
-  it('get_pipeline_summary：与 espocrm fixture 同口径同数值', async () => {
+  it('get_pipeline_summary：按 owner 聚合 open 商机金额与数量', async () => {
     const { data } = await adapter.execute({ tool: 'get_pipeline_summary', args: {} }, CALLER);
     expect(data).toEqual([
       {
@@ -104,8 +104,8 @@ describe('twenty fixture：七读四写（与 espocrm 同形）', () => {
   });
 });
 
-// 关键验证：同一套 rbac.twenty.yaml + 同一套守卫，在 twenty 后端上跑出和 espocrm 一样的行为
-describe('rbac.twenty.yaml 与守卫联动（换后端行为不变）', () => {
+// 关键验证：同一套 rbac.twenty.yaml + 同一套守卫，行级过滤/字段脱敏在 twenty 后端上如常生效
+describe('rbac.twenty.yaml 与守卫联动（守卫与后端无关）', () => {
   const SUN_QI: Principal = { userId: 'e007', role: 'sales_rep' };
   const WANG_WU: Principal = { userId: 'e005', role: 'sales_manager' };
 

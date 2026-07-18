@@ -1,22 +1,27 @@
 # 上线操作清单（VPS · 逐条照敲）
 
 > 拓扑与 ai-edge 同构：**服务只绑 loopback，Caddy 在最前做 HTTPS**。
-> foundry 比 ai-edge 简单得多——单进程、无模型下载、无 submodule。
-> 占位符：`foundry.yiongspace.com` = 网关域名；`dify.yiongspace.com` = Dify 控制台。
+> 占位符：`foundry.yiongspace.com` = 网关域名；`crm.yiongspace.com` = LangGraph 对话前端；
+> `twenty.yiongspace.com` = 自托管 Twenty CRM 后台。
 
 ```
-浏览器 / Dify / 任意 MCP host
+浏览器 / LangGraph / 任意 MCP host
    │  https
    ▼
-foundry.yiongspace.com ──► Caddy :443 ──► 127.0.0.1:3100  foundry-server（token 模式）
-dify.yiongspace.com    ──► Caddy :443 ──► 127.0.0.1:8093  Dify nginx（自托管入口层）
+foundry.yiongspace.com ──► Caddy :443 ──► 127.0.0.1:3100  foundry-server（网关，token 模式）
+crm.yiongspace.com     ──► Caddy :443 ──► 127.0.0.1:8100  LangGraph 前端（FastAPI + SSE）
+twenty.yiongspace.com  ──► Caddy :443 ──► 127.0.0.1:3200  Twenty CRM（自托管真库）
 ```
+
+网关容器经 `host.docker.internal:host-gateway` 访问宿主机发布的 Twenty
+（`TWENTY_API_URL=http://host.docker.internal:3200`）；LangGraph 容器 `network_mode: host`
+直连 `127.0.0.1:3100` 的网关 `/mcp`。
 
 ## 0. 前置
 
-- [ ] DNS：`foundry` 与 `dify` 两条 A 记录 → VPS 公网 IP（与 `api`/`trpg` 同 IP）
+- [ ] DNS：`foundry` / `crm` / `twenty` 三条 A 记录 → VPS 公网 IP（与 `api`/`trpg` 同 IP）
 - [ ] VPS 已有 Docker + Caddy（跑着 ai-edge / trpg 即已具备）
-- [ ] 内存余量 ≥ 4GB（Dify 自托管 14 个容器，约占 3–4GB；`free -h` 看 available）
+- [ ] 内存余量 ≥ 4GB（Twenty 全家桶 postgres/redis/server/worker 约占 2.5–3GB；`free -h` 看 available）
 
 ## 1. 上传代码
 
@@ -64,7 +69,9 @@ BASE=http://127.0.0.1:3100 bash smoke.sh
 五针全绿才继续：healthz 200 / 伪造头 401 / employee 3 工具无 get_salary /
 hr_admin 4 工具含 get_salary / 篡改签名 401。
 
-## 5. Caddy（两个站点，各两行）
+## 5. Caddy（三个站点）
+
+网关站点先起最简形态（§11 会给它加 /jwks.json 与落地页分流，§12/§13 加 /approvals*）。
 
 ```bash
 cat >>/etc/caddy/Caddyfile <<'EOF'
@@ -73,8 +80,12 @@ foundry.yiongspace.com {
     reverse_proxy 127.0.0.1:3100
 }
 
-dify.yiongspace.com {
-    reverse_proxy 127.0.0.1:8093
+crm.yiongspace.com {
+    reverse_proxy 127.0.0.1:8100
+}
+
+twenty.yiongspace.com {
+    reverse_proxy 127.0.0.1:3200
 }
 EOF
 systemctl reload caddy
@@ -93,68 +104,80 @@ docker compose exec -e FOUNDRY_IDENTITY_SECRET="$FOUNDRY_IDENTITY_SECRET" foundr
 ```
 
 演示令牌给足 TTL（一年），否则某天 demo 会静默失效。到期用同样命令重签、
-在 Dify 的 MCP server 编辑页更新 header。
+更新 LangGraph 客户端 `.env` 的 `FOUNDRY_MCP_TOKEN` 后重建容器。
 
-## 7. Dify 自托管
+## 7. Twenty CRM 自托管（真库后端）
+
+Twenty 官方 docker compose：postgres + redis + server + worker。端口只发布到 loopback，
+Caddy 在最前做 HTTPS（与 foundry 同姿态）。
 
 ```bash
-cd /opt && git clone --depth 1 https://github.com/langgenius/dify.git && cd dify/docker
+cd /opt && git clone --depth 1 https://github.com/twentyhq/twenty.git && cd twenty
+cp packages/twenty-docker/.env.example .env
+# 关键 env（否则启动校验失败/crash-loop）：
+#   STORAGE_TYPE=local        （留空会 config 校验失败）
+#   APP_SECRET / PG 密码       （openssl rand 生成）
+#   SERVER_URL=https://twenty.yiongspace.com
+# 端口收到 loopback：server 服务 ports 映射改成 127.0.0.1:3200:3000
+docker compose up -d
+docker compose logs server | tail -5   # 等 migration 跑完、健康
+```
+
+浏览器开 `https://twenty.yiongspace.com` 建工作区管理员，然后：
+
+- Settings → API & Webhooks 生成 API key（记到本机 `~/.config/mcp-foundry/twenty-api-key.txt`，600）
+- 给 People / Companies / Opportunities 建归属自定义字段（本项目用 `accountOwnerId`），
+  否则 `owner_id` 归属为空、行级过滤会「宁可错拒」（见 [docs/twenty-notes.md](docs/twenty-notes.md)）
+- 灌入演示数据（5 客户 / 5 联系人 / 5 商机 / 3 个销售身份的 owner 分布）
+
+网关 `.env` 接真库（设了即从 fixture 切 REST，写通道随之开）：
+
+```bash
+# /opt/mcp-foundry/.env
+TWENTY_API_URL=http://host.docker.internal:3200
+TWENTY_API_KEY=<上面的 API key>
+TWENTY_OWNER_FIELD=accountOwnerId
+docker compose up -d --force-recreate   # restart 不重载 .env，必须 force-recreate
+docker compose logs foundry-server | tail -3   # 应见 "crm backend: twenty（REST 真库）"
+```
+
+## 8. 部署 LangGraph 对话前端
+
+自建 Python 客户端（`clients/langgraph`，`langchain-mcp-adapters` 直连网关 /mcp +
+FastAPI SSE 流式前端）随 §1 rsync 一起上去。容器 `network_mode: host`、`env_file: .env`：
+
+```bash
+cd /opt/mcp-foundry/clients/langgraph
 cp .env.example .env
-sed -i "s|^EXPOSE_NGINX_PORT=.*|EXPOSE_NGINX_PORT=8093|" .env
-sed -i "s|^EXPOSE_NGINX_SSL_PORT=.*|EXPOSE_NGINX_SSL_PORT=8443|" .env   # 默认 443 会撞 Caddy
-sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$(openssl rand -base64 42)|" .env
-sed -i "s|^CONSOLE_API_URL=.*|CONSOLE_API_URL=https://dify.yiongspace.com|" .env
-sed -i "s|^CONSOLE_WEB_URL=.*|CONSOLE_WEB_URL=https://dify.yiongspace.com|" .env
-sed -i "s|^SERVICE_API_URL=.*|SERVICE_API_URL=https://dify.yiongspace.com|" .env
-sed -i "s|^APP_API_URL=.*|APP_API_URL=https://dify.yiongspace.com|" .env
-sed -i "s|^APP_WEB_URL=.*|APP_WEB_URL=https://dify.yiongspace.com|" .env
+# 填：FOUNDRY_MCP_URL=http://127.0.0.1:3100/mcp
+#     FOUNDRY_MCP_TOKEN=<§6 或 §11 签的长效令牌，决定这个前端以谁的身份连网关>
+#     FOUNDRY_LLM_BASE_URL / _API_KEY / _MODEL（OpenAI 兼容，如智谱 glm-4.6）
+docker compose up --build -d
+docker compose logs -f --tail 5   # 应见 uvicorn 起在 :8100
 ```
 
-Dify 的 nginx 默认把端口发布到 `0.0.0.0`——等于在公网裸奔一个 HTTP 控制台、
-绕过 Caddy 的 HTTPS。加 override 收到 loopback（与 foundry 同一姿态）：
-
-```bash
-cat > docker-compose.override.yml <<'EOF'
-services:
-  nginx:
-    ports: !override
-      - "127.0.0.1:8093:80"
-EOF
-docker compose config | grep -A2 'target: 80'   # 应见 host_ip: 127.0.0.1
-docker compose up -d                            # 首次拉 ~10GB 镜像，耐心等
-```
-
-foundry 走公网域名接入，**不需要** `SSRF_PROXY_ALLOW_PRIVATE_DOMAINS`
-（那条只在 Dify 直连宿主机私网地址时才需要，见 [docs/dify-integration.md](docs/dify-integration.md)）。
-
-## 8. 配置 Dify
-
-浏览器开 `https://dify.yiongspace.com/install` 建管理员，然后照
-[docs/dify-integration.md](docs/dify-integration.md) 步骤 3–4：
-
-- 装 ZHIPU AI 模型插件、填 GLM key
-- 加两个 MCP server（URL 都是 `https://foundry.yiongspace.com/mcp`，
-  第二个加 `?as=hr_admin` 绕开 Dify 的 URL 查重），header 各填对应长效令牌
-- 建两个 Agent 应用，验收：employee 3 工具 / hr_admin 4 工具，同问不同答
+验收：浏览器开 `https://crm.yiongspace.com`，问「我的商机有哪些」出真 Twenty 数据；
+越权问同事的商机被 row_denied 并如实转述「已记入审计」；涉审写触发审批卡片（§13）。
 
 ## 9. 端口暴露复核（别信 compose 写了什么，去打一下）
 
 ```bash
 # 从本机（不是服务器上）打裸端口——必须连不上
 curl -m 8 --noproxy '*' http://<VPS_IP>:3100/healthz    # 期望：连接失败
-curl -m 8 --noproxy '*' http://<VPS_IP>:8093/           # 期望：连接失败
+curl -m 8 --noproxy '*' http://<VPS_IP>:8100/           # 期望：连接失败（LangGraph）
+curl -m 8 --noproxy '*' http://<VPS_IP>:3200/           # 期望：连接失败（Twenty）
 curl -m 8 --noproxy '*' https://foundry.yiongspace.com/healthz   # 期望：200
 ```
 
 `--noproxy '*'` 不能省：本机若挂着代理，代理连不上源站会回 **502**，看起来
 像"服务器拒绝了"，其实什么都没验到（这个假阳性实测踩过）。服务器侧对照：
-`ss -tlnp | grep -E ':3100|:8093'` 应当只见 `127.0.0.1:`，不能有 `0.0.0.0:`。
+`ss -tlnp | grep -E ':3100|:8100|:3200'` 应当只见 `127.0.0.1:`，不能有 `0.0.0.0:`。
 
 ## 10. 收尾
 
 - [ ] README 诚实边界更新：公网演示地址、令牌到期口径
 - [ ] 审计卷备份策略（`foundry-audit` 卷，可选）
-- [ ] 演示数据仍是 6 人 fixture——对外说明这是演示口径，非生产数字
+- [ ] 数据口径：HR 域仍是 6 人 fixture；CRM 域是真实 Twenty（演示口径，非生产规模）
 
 ## 11. 切换到 JWKS / 轮换演示令牌（W7，已实操）
 
@@ -189,24 +212,21 @@ BASE=https://foundry.yiongspace.com \
 FOUNDRY_IDENTITY_KEY=~/.config/mcp-foundry/identity-es256.key \
 FOUNDRY_IDENTITY_KID=2026-07-vps bash smoke.sh   # 五针全绿
 
-# ⑤ 签两枚一年期令牌（本机私钥），更新 Dify 两个 MCP server 的 Authorization header
+# ⑤ 签长效令牌（本机私钥），更新 LangGraph 客户端 .env 的 FOUNDRY_MCP_TOKEN
+#   （线上 CRM 前端以 sales_manager 身份连网关；需要别的身份就换 --role/--user）
 pnpm --filter @yiong/foundry-server run mint-token \
   --key ~/.config/mcp-foundry/identity-es256.key --kid 2026-07-vps \
-  --user e002 --role employee --ttl 31536000
-pnpm --filter @yiong/foundry-server run mint-token \
-  --key ~/.config/mcp-foundry/identity-es256.key --kid 2026-07-vps \
-  --user e004 --role hr_admin --ttl 31536000
+  --user sales_manager --role sales_manager --ttl 31536000
 ```
 
-Dify 侧坑：MCP server 的 header value 是 masked 受控输入，直接粘贴不一定触发保存
-（存进去仍是旧值 → 握手 401 → 报 "Failed to discover OAuth metadata"）。稳妥做法是
-删掉旧 header 行、Add Header 重填；保存后点 Update 重拉工具面，无 OAuth 报错即成功。
-端到端验收：两个体验链接各问一句「张三的工资是多少」，employee 结构化拒答、
-hr_admin 返回真数字（18500 CNY）。
+更新客户端令牌：把新令牌写进 `/opt/mcp-foundry/clients/langgraph/.env` 的
+`FOUNDRY_MCP_TOKEN`，`docker compose up -d --force-recreate`（restart 不重载 .env）。
+端到端验收：`https://crm.yiongspace.com` 问「我的商机有哪些」出真 Twenty 数据，
+跨域问工资零泄漏、越权查同事商机被 row_denied。
 
 **轮换/换密钥**：再跑 keygen 换新 kid → 把新 JWK 追加进 `/opt/foundry-keys/jwks.json`
-的 keys（新旧并存过渡，Foundry 按 mtime... 实为 URL 轮询热更新，≤ 刷新间隔生效）→
-用新私钥重签令牌、更新 Dify header → 过渡期结束删旧 JWK 即吊销旧 kid。私钥落盘 0600、
+的 keys（新旧并存过渡，Foundry 按 URL 轮询热更新，≤ 刷新间隔生效）→ 用新私钥重签令牌、
+更新 LangGraph 客户端 .env → 过渡期结束删旧 JWK 即吊销旧 kid。私钥落盘 0600、
 `.key/.pem` 已被 .gitignore；令牌明文只存本机 `~/.config/mcp-foundry/`（600），不进仓库。
 
 ## 12. 落地页（根路径 GET 给人看，/mcp 仍只给机器）
@@ -240,7 +260,7 @@ FOUNDRY_IDENTITY_KID=2026-07-vps bash smoke.sh                 # 五针仍全绿
 
 ## 13. 审批闸门（W9：涉审写工具 + /approvals 决策端点）
 
-代码随 rsync + rebuild 自动生效，无独立开关——闸门由 `config/rbac.espocrm.yaml`
+代码随 rsync + rebuild 自动生效，无独立开关——闸门由 `config/rbac.twenty.yaml`
 的 `approval:` 列表驱动（sales_rep 的 update/delete_contact、update_opportunity_stage
 涉审；create_contact 免审；sales_manager 免审且 `approver: true`）。单据落
 `/app/audit/approvals.jsonl`（与审计同卷，已被 §1 的 `audit/*.jsonl` 排除项覆盖，
@@ -261,5 +281,5 @@ curl -s -X POST https://foundry.yiongspace.com/approvals/<id> \
 飞书侧（独立进程，单据文件独立 `audit/approvals.feishu.jsonl`）：控制台
 「事件与回调」把 `card.action.trigger` 回调订阅为**使用长连接接收**即可，
 无需公网 URL；可选 `FEISHU_APPROVAL_CHAT_ID` 指定审批卡片投递会话（缺省发到
-触发对话本身）。真库写通道（可选）：EspoCRM 后台建 API 用户拿 X-Api-Key，
-`.env` 设 `ESPOCRM_REST_URL` + `ESPOCRM_REST_API_KEY`——不设时 MySQL 模式拒写。
+触发对话本身）。真库写通道：网关 `.env` 设 `TWENTY_API_URL` + `TWENTY_API_KEY`（§7）
+即从 fixture 切 Twenty REST，审批通过后的写落到真实 Twenty；不设时走 fixture。

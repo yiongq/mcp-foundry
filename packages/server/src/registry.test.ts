@@ -12,8 +12,8 @@ const orangehrm: SystemAdapter = {
   execute: async () => ({ data: null }),
 };
 
-const espocrm: SystemAdapter = {
-  system: 'espocrm',
+const twenty: SystemAdapter = {
+  system: 'twenty',
   tools: () => ['list_accounts', 'get_opportunity'].map(spec),
   execute: async () => ({ data: null }),
 };
@@ -38,7 +38,7 @@ roles:
 const audit = new MemoryAuditLogger();
 const systems = [
   { adapter: orangehrm, guard: new Guard(hrRbac, audit) },
-  { adapter: espocrm, guard: new Guard(crmRbac, audit) },
+  { adapter: twenty, guard: new Guard(crmRbac, audit) },
 ];
 
 describe('allowedToolEntries', () => {
@@ -69,7 +69,7 @@ describe('allowedToolEntries', () => {
 
   it('工具条目带回所属系统的守卫——按域裁决、按域审计的前提', () => {
     const entries = allowedToolEntries(systems, { userId: 'e005', role: 'sales_manager' });
-    expect(entries.every((e) => e.adapter.system === 'espocrm')).toBe(true);
+    expect(entries.every((e) => e.adapter.system === 'twenty')).toBe(true);
     expect(entries.every((e) => e.guard === systems[1]?.guard)).toBe(true);
   });
 });
@@ -85,7 +85,7 @@ describe('assertUniqueToolNames', () => {
   });
 
   it('无冲突时不抛', () => {
-    expect(() => assertUniqueToolNames([orangehrm, espocrm])).not.toThrow();
+    expect(() => assertUniqueToolNames([orangehrm, twenty])).not.toThrow();
   });
 });
 

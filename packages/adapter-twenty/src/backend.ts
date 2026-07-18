@@ -1,7 +1,6 @@
 /**
- * Twenty CRM 适配器的统一行结构——刻意与 adapter-espocrm 逐字段同名
- * （account/contact/opportunity，owner_id 归属戳），使得同一套守卫规则、同一套工具、
- * 同一批评测题面在两个后端上通用：换 CRM 后端对上层完全透明。
+ * Twenty CRM 适配器的统一行结构——固定为 account/contact/opportunity 三类 + owner_id 归属戳，字段名 snake_case，
+ * 与 RBAC 行规则里的 field（owner_id）逐字对齐、与守卫/评测解耦。
  * Twenty 侧的真实字段（firstName/lastName、jobTitle、company 关系、emails 数组）
  * 在 REST 后端里翻译成这套形状，映射见 src/rest.ts 与 docs/twenty-notes.md。
  */
@@ -70,7 +69,7 @@ export interface UpdateContactPatch {
 
 /**
  * 数据来源抽象：fixture（内置演示数据）与 Twenty REST 各实现一份。
- * 写方法约定同 espocrm：目标不存在返回 null；update/delete 返回受影响的完整行
+ * 写方法约定：目标不存在返回 null；update/delete 返回受影响的完整行
  * （必须含 owner_id——守卫行级过滤在返回值上跑，缺归属字段会被误拒）。
  */
 export interface TwentyBackend {

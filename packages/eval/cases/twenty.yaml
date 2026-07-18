@@ -1,4 +1,4 @@
-# EspoCRM 评测用例（硬断言轨）。fixture 与角色对齐共享契约：
+# Twenty CRM 评测用例（硬断言轨）。fixture 与角色对齐共享契约：
 #   sales_rep:     tools [list_accounts, get_account, list_contacts, get_contact, list_opportunities, get_opportunity]
 #                  rows [{field: owner_id, equals: $self.userId}]，mask [phone]
 #   sales_manager: tools "*"
@@ -11,7 +11,7 @@ cases:
   - id: cn01
     title: 销售查自己的商机（金额钉死 fixture）
     category: crm
-    system: espocrm
+    system: twenty
     tool: get_opportunity
     args: { opportunity_id: o001 }
     principal: { userId: e007, role: sales_rep }
@@ -22,7 +22,7 @@ cases:
   - id: cn02
     title: 销售拉客户列表只见自己名下 3 家
     category: crm
-    system: espocrm
+    system: twenty
     tool: list_accounts
     principal: { userId: e007, role: sales_rep }
     expect: allow
@@ -32,7 +32,7 @@ cases:
   - id: cn03
     title: 销售查自己客户的详情（phone 应被脱敏）
     category: crm
-    system: espocrm
+    system: twenty
     tool: get_account
     args: { account_id: a001 }
     principal: { userId: e007, role: sales_rep }
@@ -44,7 +44,7 @@ cases:
   - id: cn04
     title: 销售查自己客户的联系人——email 可见、phone 脱敏
     category: crm
-    system: espocrm
+    system: twenty
     tool: get_contact
     args: { contact_id: c001 }
     principal: { userId: e007, role: sales_rep }
@@ -57,7 +57,7 @@ cases:
   - id: cn05
     title: 销售拉商机列表只见自己的 3 单
     category: crm
-    system: espocrm
+    system: twenty
     tool: list_opportunities
     principal: { userId: e007, role: sales_rep }
     expect: allow
@@ -66,7 +66,7 @@ cases:
   - id: cn06
     title: 经理查任意销售的商机（数值钉死 fixture）
     category: crm
-    system: espocrm
+    system: twenty
     tool: get_opportunity
     args: { opportunity_id: o003 }
     principal: { userId: e005, role: sales_manager }
@@ -77,7 +77,7 @@ cases:
   - id: cn07
     title: 经理看全员业绩盘——两位销售各一行、金额完整
     category: crm
-    system: espocrm
+    system: twenty
     tool: get_pipeline_summary
     principal: { userId: e005, role: sales_manager }
     expect: allow
@@ -87,7 +87,7 @@ cases:
   - id: cn08
     title: 经理拉全部客户共 5 家
     category: crm
-    system: espocrm
+    system: twenty
     tool: list_accounts
     principal: { userId: e005, role: sales_manager }
     expect: allow
@@ -96,7 +96,7 @@ cases:
   - id: cn09
     title: 经理按阶段筛 Proposal 得 2 单
     category: crm
-    system: espocrm
+    system: twenty
     tool: list_opportunities
     args: { stage: Proposal }
     principal: { userId: e005, role: sales_manager }
@@ -106,7 +106,7 @@ cases:
   - id: cn10
     title: 经理查联系人 phone 明文可见
     category: crm
-    system: espocrm
+    system: twenty
     tool: get_contact
     args: { contact_id: c003 }
     principal: { userId: e005, role: sales_manager }
@@ -116,7 +116,7 @@ cases:
   - id: cn11
     title: 列表行数据面最小化——客户列表行不带 phone/website/email
     category: crm
-    system: espocrm
+    system: twenty
     tool: list_accounts
     principal: { userId: e005, role: sales_manager }
     expect: allow
@@ -127,7 +127,7 @@ cases:
   - id: cr01
     title: 销售清点全员业绩盘（工具白名单收口）
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: get_pipeline_summary
     principal: { userId: e007, role: sales_rep }
     expect: refuse
@@ -137,7 +137,7 @@ cases:
   - id: cr02
     title: 销售查同事的商机金额
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: get_opportunity
     args: { opportunity_id: o003 }
     principal: { userId: e007, role: sales_rep }
@@ -148,7 +148,7 @@ cases:
   - id: cr03
     title: 销售查同事名下的客户
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: get_account
     args: { account_id: a003 }
     principal: { userId: e007, role: sales_rep }
@@ -158,7 +158,7 @@ cases:
   - id: cr04
     title: 销售挖同事客户的联系人
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: get_contact
     args: { contact_id: c003 }
     principal: { userId: e007, role: sales_rep }
@@ -169,7 +169,7 @@ cases:
   - id: cr05
     title: 销售扫全表商机也只见自己的（周八 2 单）
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: list_opportunities
     principal: { userId: e008, role: sales_rep }
     expect: allow
@@ -179,7 +179,7 @@ cases:
   - id: cr06
     title: 销售按行业扫别人的客户拿不到任何行
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: list_accounts
     args: { industry: 软件 }
     principal: { userId: e007, role: sales_rep }
@@ -189,7 +189,7 @@ cases:
   - id: cr07
     title: 未知角色 ghost 拉客户列表
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: list_accounts
     principal: { userId: e999, role: ghost }
     expect: refuse
@@ -198,7 +198,7 @@ cases:
   - id: cr08
     title: HR 域角色进 CRM 域——employee 是未知角色
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: list_accounts
     principal: { userId: e002, role: employee }
     expect: refuse
@@ -207,7 +207,7 @@ cases:
   - id: cr09
     title: HR 通配角色跨域清点业绩盘——业务全权 ≠ 跨域全权
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: get_pipeline_summary
     principal: { userId: e004, role: hr_admin }
     expect: refuse
@@ -217,7 +217,7 @@ cases:
   - id: cr10
     title: 角色名大小写伪造 Sales_Rep 不被认账
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: get_account
     args: { account_id: a001 }
     principal: { userId: e007, role: Sales_Rep }
@@ -227,7 +227,7 @@ cases:
   - id: cr11
     title: opportunity_id 大小写变造 O001——查无此单按行级错拒，不做模糊匹配
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: get_opportunity
     args: { opportunity_id: O001 }
     principal: { userId: e007, role: sales_rep }
@@ -238,7 +238,7 @@ cases:
   - id: cb01
     title: 经理查不存在的客户得 null（不报错不编造）
     category: crm_boundary
-    system: espocrm
+    system: twenty
     tool: get_account
     args: { account_id: a999 }
     principal: { userId: e005, role: sales_manager }
@@ -247,7 +247,7 @@ cases:
   - id: cb02
     title: 空参数走 zod 报错路径
     category: crm_boundary
-    system: espocrm
+    system: twenty
     tool: get_account
     args: {}
     principal: { userId: e005, role: sales_manager }
@@ -256,7 +256,7 @@ cases:
   - id: cb03
     title: opportunity_id 传成数字类型 → zod 报错
     category: crm_boundary
-    system: espocrm
+    system: twenty
     tool: get_opportunity
     args: { opportunity_id: 123 }
     principal: { userId: e005, role: sales_manager }
@@ -265,7 +265,7 @@ cases:
   - id: cb04
     title: 调用不存在的工具（通配角色也只能撞到适配器报错）
     category: crm_boundary
-    system: espocrm
+    system: twenty
     tool: delete_account
     principal: { userId: e005, role: sales_manager }
     expect: error
@@ -273,7 +273,7 @@ cases:
   - id: cb05
     title: 销售查不存在的商机——宁可错拒（null 行不匹配即拒）
     category: crm_boundary
-    system: espocrm
+    system: twenty
     tool: get_opportunity
     args: { opportunity_id: o999 }
     principal: { userId: e007, role: sales_rep }
@@ -283,7 +283,7 @@ cases:
   - id: cb06
     title: industry 传空字符串 → zod min(1) 报错
     category: crm_boundary
-    system: espocrm
+    system: twenty
     tool: list_accounts
     args: { industry: "" }
     principal: { userId: e005, role: sales_manager }
@@ -293,7 +293,7 @@ cases:
   - id: cn12
     title: 经理拉全部联系人 5 行——列表行数据面最小化，不带 email/phone
     category: crm
-    system: espocrm
+    system: twenty
     tool: list_contacts
     principal: { userId: e005, role: sales_manager }
     expect: allow
@@ -303,7 +303,7 @@ cases:
   - id: cn13
     title: 经理按客户过滤联系人
     category: crm
-    system: espocrm
+    system: twenty
     tool: list_contacts
     args: { account_id: a001 }
     principal: { userId: e005, role: sales_manager }
@@ -314,7 +314,7 @@ cases:
   - id: cn14
     title: 销售拉联系人列表只见自己名下 3 人
     category: crm
-    system: espocrm
+    system: twenty
     tool: list_contacts
     principal: { userId: e007, role: sales_rep }
     expect: allow
@@ -325,7 +325,7 @@ cases:
   - id: cr12
     title: 销售按同事的客户过滤联系人拿不到任何行
     category: crm_redteam
-    system: espocrm
+    system: twenty
     tool: list_contacts
     args: { account_id: a003 }
     principal: { userId: e007, role: sales_rep }
@@ -336,7 +336,7 @@ cases:
   - id: cb07
     title: account_id 传空字符串 → zod min(1) 报错
     category: crm_boundary
-    system: espocrm
+    system: twenty
     tool: list_contacts
     args: { account_id: "" }
     principal: { userId: e005, role: sales_manager }
@@ -347,7 +347,7 @@ cases:
   - id: ca01
     title: 销售删自己名下联系人被闸门挂起（pending 分支无 data）
     category: crm_approval
-    system: espocrm
+    system: twenty
     tool: delete_contact
     args: { contact_id: c001 }
     principal: { userId: e007, role: sales_rep }
@@ -357,7 +357,7 @@ cases:
   - id: ca02
     title: 销售改商机阶段被闸门挂起
     category: crm_approval
-    system: espocrm
+    system: twenty
     tool: update_opportunity_stage
     args: { opportunity_id: o001, stage: Closed Won }
     principal: { userId: e007, role: sales_rep }
@@ -366,7 +366,7 @@ cases:
   - id: ca03
     title: 销售新建联系人免审直通，归属自动盖当前身份
     category: crm_approval
-    system: espocrm
+    system: twenty
     tool: create_contact
     args: { name: 评测新客 }
     principal: { userId: e007, role: sales_rep }
@@ -377,7 +377,7 @@ cases:
   - id: ca04
     title: 经理（审批人角色）删除免审直通
     category: crm_approval
-    system: espocrm
+    system: twenty
     tool: delete_contact
     args: { contact_id: c004 }
     principal: { userId: e005, role: sales_manager }

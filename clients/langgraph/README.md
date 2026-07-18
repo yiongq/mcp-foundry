@@ -5,8 +5,8 @@
 > 接上 mcp-foundry 网关的自建对话客户端——证明守卫（角色收窄 / 行级过滤 / 字段脱敏 /
 > 人工审批 / 审计）做在基础设施层，与 agent 框架无关。
 
-Dify 用的是这个网关，飞书 bot 用的是这个网关，这个 LangGraph 客户端也是这个网关——
-三个不同框架、同一条 `POST /mcp`，拿到的是各自身份收窄后的同一套安全边界。
+飞书 bot 用的是这个网关，这个 LangGraph 客户端也是这个网关，任意 MCP host 连的还是这个网关——
+不同框架、同一条 `POST /mcp`，拿到的是各自身份收窄后的同一套安全边界。
 本客户端**一行策略代码都没有**：工具面已被网关按身份收窄，越权数据在网关出口就不存在，
 高危写被闸门挡在执行前。它只负责把身份头带上、把对话流式渲染出来。
 
@@ -53,7 +53,7 @@ cp .env.example .env      # 填 FOUNDRY_LLM_API_KEY（GLM/DeepSeek/任意 OpenAI
                                                     │ langchain-mcp-adapters
                                                     ▼
                         mcp-foundry 网关  POST /mcp   （身份头透传）
-                                                    │  ← 同一个网关，Dify/飞书也连这里
+                                                    │  ← 同一个网关，飞书 bot 也连这里
                           GuardedResult(ok|refusal|pending|error) 原样回流
                                                     │
        审批：前端 ──/api/approvals──► FastAPI 代理 ──► 网关 /approvals（审批人身份）
@@ -93,4 +93,5 @@ HITL 闭环走完，是「LangGraph ↔ 网关」这个最吃劲集成点的真�
 - 批准后的续跑是**服务端按单据 tool+args 直接重发**（非让 LLM 重发）——线程有记忆时
   LLM 会以为已提交、不再调工具，票永远消费不掉；直接重发确定消票，且 argsHash 一致。
 - Python 服务不进主仓的 pnpm CI（不同工具链）；质量门是本目录的 pytest + ruff，手动或另配。
-- 尚未替换线上 Dify；本客户端与 Dify 可并存同连一个网关（这正是框架无关的实景证据）。
+- 本客户端就是线上 CRM 前端（`crm.yiongspace.com`），连真实 Twenty 真库；飞书 bot 连同一
+  网关的另一路，不同框架同一套安全边界——这正是「守卫与框架无关」的实景证据。

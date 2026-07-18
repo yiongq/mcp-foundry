@@ -14,14 +14,14 @@ import type {
 /**
  * Twenty CRM REST 后端（Core API：/rest/ + Authorization: Bearer <API_KEY>）。
  *
- * 与 EspoCRM 后端最大的不同在字段形状：Twenty 的 person 姓名是复合对象
- * { firstName, lastName }，邮箱/电话是复合字段（emails.primaryEmail 等），
- * jobTitle 是职务，company 是关系（companyId）。这里把它们翻译成与 espocrm 逐字段
- * 同名的统一行结构，于是同一套守卫/工具/评测在两个后端通用。
+ * Twenty 的字段是复合形状：person 姓名是 { firstName, lastName }，邮箱/电话是
+ * 复合字段（emails.primaryEmail 等），jobTitle 是职务，company 是关系（companyId）。
+ * 这里把它们翻译成扁平、逐字段命名的统一行结构，于是同一套守卫/工具/评测在
+ * fixture 与真库两种后端上通用（守卫与后端无关）。
  *
- * 诚实边界：映射按 Twenty 公开文档整理，**未对真实实例实测**——响应包封形状
- * （{data:{people:[…]}} vs {data:[…]}）、owner 归属字段、opportunity 阶段枚举
- * 等不确定项集中记录在 docs/twenty-notes.md（标「待实测」）。改映射先改那份笔记。
+ * 已对真实自托管 Twenty 实例验证（REST + Bearer，线上 crm.yiongspace.com）：
+ * 响应包封形状（读 {data:{people:[…]}}、写 {data:{createPerson:{…}}}）、
+ * amountMicros 为 JSON 字符串、owner 归属字段等实测坑记录在 docs/twenty-notes.md。
  * 单测用注入的 fetch 驱动，覆盖字段映射逻辑本身。
  */
 export interface TwentyRestOptions {
@@ -95,7 +95,7 @@ function fullName(
     | null
     | undefined,
 ): string {
-  // 空格拼接（与 EspoCRM 服务端 first+last 组合口径一致）；本适配器写入时整名入 lastName、
+  // 空格拼接 firstName + lastName；本适配器写入时整名入 lastName、
   // firstName 为空，filter 会先抹掉空串，所以中文单名不会多出前导空格；真实拆分姓名读回带空格。
   return [name?.firstName, name?.lastName]
     .filter((s): s is string => !!s && s.trim() !== '')

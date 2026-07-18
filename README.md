@@ -6,11 +6,10 @@
 把内部系统（先做 HR，现已加上 CRM 演示域）接到 MCP 上，并在协议层前面加一道守卫：
 谁、能用哪些工具、能看到哪些行哪些字段，高危写操作先过人的点头，问过什么都有账可查。
 
-**线上可体验**（免注册，两个链接问同一句「张三的工资是多少」）：
-[员工视角](https://dify.yiongspace.com/chat/kg6XFb18BoBfzHj2)结构化拒答 ·
-[HR 视角](https://dify.yiongspace.com/chat/CP3QrYkheA2Zz6P5)返回真实数字。
-两个应用连的是**同一个网关地址**（`https://foundry.yiongspace.com/mcp`），只有身份令牌不同——
-员工那个的工具面里根本没有 `get_salary`，不是模型忍住不说。
+**线上可体验**（免注册）：[CRM 助手 crm.yiongspace.com](https://crm.yiongspace.com)——
+自建 LangGraph 流式聊天前端，连**生产网关**（`https://foundry.yiongspace.com/mcp`，ES256 令牌），
+后端是真实的 [Twenty CRM](https://twenty.yiongspace.com)。用一句话查改 CRM，高危写走人工审批，
+全程按身份收窄工具面、行级过滤、字段脱敏、留审计。
 
 ## 为什么做：三个事故 → 三个能力
 
@@ -33,7 +32,7 @@ CRM 域开放写工具后补上第四道：**高危写操作人工审批（Human
 
 ```
 入口层（多入口，身份都透传给同一套守卫——守卫做在基础设施层，与 agent 框架无关）
-  ├─ MCP 客户端（Claude Code / Dify / 任意 Streamable HTTP host）
+  ├─ MCP 客户端（Claude Code / 任意 Streamable HTTP host）
   │    POST /mcp，身份：Bearer 签名令牌（生产）或 x-foundry-* 头（demo）
   │    → packages/server（@yiong/foundry-server，无状态）
   ├─ LangGraph 客户端（clients/langgraph，Python + FastAPI，自建流式前端）
@@ -53,9 +52,8 @@ CRM 域开放写工具后补上第四道：**高危写操作人工审批（Human
 │ SystemAdapter：orangehrm（HR）              │    ERP …（路线图，今天没有）
 │   fixture / 只读 MySQL（真实 OrangeHRM 5.7） │
 │              ：CRM（后端可热切，同工具同守卫）│
-│   espocrm：fixture / 只读 MySQL（EspoCRM 9.3）│
-│   twenty ：fixture / REST（Twenty，Bearer）  │
-│   FOUNDRY_CRM_BACKEND=espocrm|twenty         │
+│              ：twenty（CRM）                 │
+│   fixture / REST（真实 Twenty，Bearer API key）│
 │              ：memory（跨会话记忆，域内 RBAC）│
 └────────────────────────────────────────────┘
 ```
@@ -105,7 +103,7 @@ curl -s http://localhost:3100/mcp \
 tail -3 audit/foundry.jsonl
 ```
 
-同一个网关还挂着第二个业务域（CRM，EspoCRM 形状的 fixture）。角色按域独立：
+同一个网关还挂着第二个业务域（CRM，Twenty 适配器）。角色按域独立：
 销售看不到全员业绩盘，HR 的通配权力跨不进 CRM——
 
 ```bash
@@ -199,23 +197,23 @@ ETag/If-None-Match，**忽略 Cache-Control**（这是刷新间隔，不是 HTTP
 陈旧度会合法冲到「间隔+在途时延」，还要容一次失败轮询，更紧的截止对健康端点也会误伤）：
 超过该时长没刷新成功，验签一律 401（304 也算刷新成功）。
 
-签名令牌让第三方 Agent 平台零代码接入：Dify 已实测并**上了公网**（自托管 1.16）——
-同一个网关地址挂两个 MCP server、只有令牌不同，两个 Agent 应用的工具面在 Dify 界面里
-肉眼可见地不同（employee 3 个工具 / hr_admin 4 个），同问不同答、审计留痕（上面的两个
-体验链接就是它们）。接入步骤与踩坑见 [docs/dify-integration.md](docs/dify-integration.md)，
-上线清单见 [DEPLOY-CHECKLIST.md](DEPLOY-CHECKLIST.md)。
+签名令牌让任意 MCP 客户端零改造接入网关。线上跑的是自建的 LangGraph 客户端
+（Python，`langchain-mcp-adapters` 直连网关 MCP、FastAPI + SSE 流式前端）——
+同一个网关地址、只有令牌不同，sales_rep 与 sales_manager 的工具面/行数/脱敏在
+同一个对话前端里肉眼可见地不同，越权即 row_denied 并如实转述「已记入审计」。
+客户端源码见 [clients/langgraph/](clients/langgraph/)，上线清单见
+[DEPLOY-CHECKLIST.md](DEPLOY-CHECKLIST.md)。
 
 ## 诚实边界
 
-- 两条业务链路都已对真实系统验证：HR 对真实 OrangeHRM 5.7、CRM 对真实 EspoCRM 9.3
-  （都是只读 MySQL、SELECT-only 账号），fixture 与真库双后端跑同一套 82 题均全绿，
-  双域双真库组合亦全绿（[docs/espocrm-notes.md](docs/espocrm-notes.md)）；「已验证」
-  指本地 docker 真库、演示数据口径，不是生产环境；ERP 仍是路线图。
+- 两条业务链路都已对真实系统验证：HR 对真实 OrangeHRM 5.7（只读 MySQL、SELECT-only
+  账号，本地 docker），CRM 对真实 Twenty（REST + Bearer API key）。**CRM 这条已上公网**：
+  线上网关连自托管 Twenty 真库，`crm.yiongspace.com` 的对话前端读写的是真实 Twenty 数据。
+  fixture 与真库两种后端跑同一套评测均全绿；「已验证」是演示数据口径、不是生产规模。
 - 演示与评测数据都是演示口径（HR 6 人；CRM 5 客户 / 5 联系人 / 5 商机 / 3 个销售身份），
   非生产数字。
-- 角色不跨域：demo 身份（employee/hr_admin）不在 CRM 域的 RBAC 里，所以两个线上体验
-  链接的工具面与行为**不因 CRM 域并入而改变**——线上网关是否已部署到含 CRM 的版本，
-  只影响能否用 sales_* 令牌访问 CRM 工具。
+- 角色不跨域：CRM 域的角色是 sales_rep/sales_manager，HR 域是 employee/hr_admin，
+  两套身份各自登记在各自域的 RBAC 里，通配权力跨不进对方域。
 - HTTP 入口两种生产验签：共享密钥 HS256（W3，单网关）与非对称 JWKS（W5 本地文件 /
   W6 URL 拉取，ES256/RS256，多签发方 + 热轮换）。**线上实例现跑 JWKS URL 模式**
   （W7，2026-07-17 切换）：Foundry 从 `https://foundry.yiongspace.com/jwks.json`
@@ -231,18 +229,18 @@ ETag/If-None-Match，**忽略 Cache-Control**（这是刷新间隔，不是 HTTP
 - 飞书链路三个域都已在真实飞书应用上端到端验证（HR + 记忆 2026-07-16；CRM
   2026-07-17，网页端实测：sales_rep 查自己的单出真数、联系人电话脱敏而邮箱可见、
   越权查同事商机被 row_denied 并如实转述「已记入审计」、跨域问工资零泄漏；
-  hr_admin 反向无任何 CRM 能力；审计逐条留痕）。演示数据仍是 fixture 口径；
+  hr_admin 反向无任何 CRM 能力；审计逐条留痕）。飞书 bot 默认走 fixture 口径；
   机器人在飞书里的显示名/简介来自开发者后台的应用配置，与代码无关。
 - 行级/字段规则只在 Guard 出口生效：绕过 Foundry 直连源系统它管不到——部署上要求源系统凭据只发给
   Foundry。
-- **线上演示的身份是"配好的"，不是"登录来的"**：两个体验链接各自绑死一枚长效令牌，
+- **线上演示的身份是"配好的"，不是"登录来的"**：CRM 前端绑死一枚长效令牌，
   访客点开即是该身份，不能自己切换——这演示的是「同一网关、不同身份、行为不同」，
   不是一套面向访客的登录系统。生产接法是网关/SSO 在用户登录后按其真实身份签发令牌。
-- 线上跑的是 fixture 后端（演示数据），不连真实 OrangeHRM/EspoCRM——两条真库链路都
-  只在本地验证过（只读 MySQL，SELECT-only 账号）。
+- 线上 CRM 域连的是真实 Twenty（REST + Bearer），HR 域线上仍走 fixture——真实
+  OrangeHRM 只读 MySQL 链路只在本地验证过（SELECT-only 账号）。
 - 演示令牌 TTL 一年（2027-07 到期），现为 ES256（JWKS 模式）。过期后演示会静默失效——
-  届时用 mint-token 拿本机私钥重签、更新 Dify 的 MCP server header（步骤见
-  [DEPLOY-CHECKLIST.md](DEPLOY-CHECKLIST.md) 的「切换到 JWKS / 轮换演示令牌」）。
+  届时用 mint-token 拿本机私钥重签、更新 LangGraph 客户端 `.env` 的 `FOUNDRY_MCP_TOKEN`
+  （步骤见 [DEPLOY-CHECKLIST.md](DEPLOY-CHECKLIST.md) 的「切换到 JWKS / 轮换演示令牌」）。
 
 ## 名称说明
 

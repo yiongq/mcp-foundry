@@ -1,6 +1,6 @@
-import { createEspoCrmAdapter } from '@yiong/foundry-adapter-espocrm';
 import { createMemoryAdapter, MemoryStore } from '@yiong/foundry-adapter-memory';
 import { createOrangeHrmAdapter } from '@yiong/foundry-adapter-orangehrm';
+import { createTwentyAdapter } from '@yiong/foundry-adapter-twenty';
 import type { Principal, SystemAdapter } from '@yiong/foundry-core';
 import { Guard, loadRbacConfig, MemoryAuditLogger } from '@yiong/foundry-core';
 import { describe, expect, it } from 'vitest';
@@ -55,7 +55,7 @@ function buildToolset(): GuardedToolset {
   const audit = new MemoryAuditLogger();
   return new GuardedToolset([
     { adapter: createOrangeHrmAdapter({ env: {} }), guard: new Guard(rbacHr, audit) },
-    { adapter: createEspoCrmAdapter({ env: {} }), guard: new Guard(rbacCrm, audit) },
+    { adapter: createTwentyAdapter({ env: {} }), guard: new Guard(rbacCrm, audit) },
     { adapter: createMemoryAdapter(new MemoryStore()), guard: new Guard(rbacMemory, audit) },
   ]);
 }

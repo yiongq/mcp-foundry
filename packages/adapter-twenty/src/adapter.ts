@@ -130,7 +130,7 @@ class TwentyAdapter implements SystemAdapter {
     }
   }
 
-  /** 改写已存在行的写工具前像：守卫据此在 execute 前核归属（与 espocrm 同款语义）。 */
+  /** 改写已存在行的写工具前像：守卫据此在 execute 前核归属。 */
   async preimage(call: ToolCall): Promise<unknown> {
     const arg = (key: string): string | undefined =>
       typeof call.args[key] === 'string' ? (call.args[key] as string) : undefined;

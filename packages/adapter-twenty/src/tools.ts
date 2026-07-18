@@ -1,7 +1,7 @@
 import type { ToolSpec } from '@yiong/foundry-core';
 import { z } from 'zod';
 
-// 与 adapter-espocrm 同名同形的 CRM 工具面——换后端不换工具，上层零感知。
+// CRM 工具面：账户/联系人/商机的读 + 写（create/update/delete_contact、update_opportunity_stage）。
 export const listAccountsInput = z.object({
   industry: z.string().min(1).optional(),
 });
@@ -28,7 +28,7 @@ export const opportunityIdInput = z.object({
 
 export const pipelineSummaryInput = z.object({});
 
-/** 演示口径沿用 EspoCRM 缺省销售阶段枚举，使两后端行为可直接对照 */
+/** 销售阶段枚举（钉死取值，自由字符串会把脏值写进真库） */
 export const OPPORTUNITY_STAGES = [
   'Prospecting',
   'Qualification',
