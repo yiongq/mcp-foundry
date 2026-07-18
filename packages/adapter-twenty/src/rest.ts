@@ -344,20 +344,72 @@ export class TwentyRestBackend implements TwentyBackend {
     return one === null ? null : this.toOpportunityRow(one);
   }
 
-  // 退款是 fixture 演示能力：真实 Twenty 无「订单/退款」对象，故 REST 后端不支持。
-  // getOrder 返回 null（守卫前像走缺失语义），issueRefund 显式抛错——线上调用会得到
-  // 结构化 error，而不是静默假成功。要接真实支付需另建订单/退款域适配器。
-  async getOrder(_orderId: string): Promise<OrderRow | null> {
-    return null;
+  // 退款接 Twenty 自定义对象 Order/Refund（工作区需先建好，见 docs/twenty-notes.md）。
+  // 记录数小，按客户端过滤（同 listAccounts 的 industry 过滤），不依赖 Twenty 的 filter 语法。
+  private toOrderRow(raw: unknown): OrderRow {
+    const o = raw as Record<string, unknown>;
+    const paid = typeof o.amountPaid === 'number' ? o.amountPaid : Number(o.amountPaid);
+    return {
+      order_id: typeof o.name === 'string' ? o.name : '',
+      account_id: '',
+      email: typeof o.email === 'string' ? o.email : '',
+      last_four: typeof o.lastFour === 'string' ? o.lastFour : '',
+      amount_paid: Number.isFinite(paid) ? paid : 0,
+      currency: 'CNY',
+      owner_id: readOwner(o, this.ownerField),
+    };
   }
 
-  async issueRefund(_input: RefundInput): Promise<RefundResult> {
-    throw new Error(
-      'issue_refund 是 fixture 演示能力：真实 Twenty 无订单/退款对象，REST 后端不支持',
+  async getOrder(orderId: string): Promise<OrderRow | null> {
+    const rows = this.unwrapList(await this.request('GET', '/orders'), 'orders');
+    const match = rows.find((r) => (r as Record<string, unknown>).name === orderId);
+    return match === undefined ? null : this.toOrderRow(match);
+  }
+
+  async issueRefund(input: RefundInput): Promise<RefundResult> {
+    const order = await this.getOrder(input.order_id);
+    // 归属前置校验通常已在守卫拦下越权；这里兜身份核验与金额（直调后端也不放行）
+    if (order === null) throw new Error(`退款失败：订单 ${input.order_id} 不存在`);
+    if (order.email !== input.email || order.last_four !== input.last_four) {
+      throw new Error('退款失败：身份核验不通过（邮箱或卡尾号与订单不符）');
+    }
+    if (!(input.amount > 0)) throw new Error('退款失败：金额必须为正数');
+    if (input.amount > order.amount_paid) {
+      throw new Error(`退款失败：金额 ${input.amount} 超过订单已付 ${order.amount_paid}`);
+    }
+    const code = `rf-${input.order_id}-${Date.now()}`;
+    const created = this.unwrapOne(
+      await this.request('POST', '/refunds', {
+        name: code,
+        orderCode: order.order_id,
+        amount: input.amount,
+        status: 'issued',
+        [this.ownerField]: order.owner_id, // 归属随订单，参数伪造不了
+      }),
+      'createRefund',
+      'refund',
     );
+    const rec = (created ?? {}) as Record<string, unknown>;
+    return {
+      refund_id: typeof rec.id === 'string' ? rec.id : code,
+      order_id: order.order_id,
+      account_id: order.account_id,
+      amount: input.amount,
+      currency: order.currency,
+      status: 'issued',
+      owner_id: order.owner_id,
+    };
   }
 
-  async refundCountThisMonth(_ownerId: string): Promise<number> {
-    return 0;
+  async refundCountThisMonth(ownerId: string): Promise<number> {
+    const rows = this.unwrapList(await this.request('GET', '/refunds'), 'refunds');
+    const now = new Date();
+    const since = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    return rows.filter((r) => {
+      const rec = r as Record<string, unknown>;
+      if (readOwner(rec, this.ownerField) !== ownerId) return false;
+      const created = typeof rec.createdAt === 'string' ? rec.createdAt : '';
+      return created >= since; // ISO 字符串按字典序即时间序
+    }).length;
   }
 }

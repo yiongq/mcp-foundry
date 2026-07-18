@@ -170,3 +170,107 @@ describe('TwentyRestBackend 字段映射', () => {
     await expect(backend(fetchImpl).getContact('x')).rejects.toThrow(/HTTP 500/);
   });
 });
+
+// 退款走 Twenty 自定义对象 Order/Refund；归属字段用 repCode（同线上配置）
+function repBackend(fetchImpl: typeof fetch) {
+  return new TwentyRestBackend({
+    baseUrl: 'https://crm.example.com/',
+    apiKey: 'k1',
+    ownerField: 'repCode',
+    fetchImpl,
+  });
+}
+const ORDER = {
+  id: 'o-1',
+  name: 'ord-1001',
+  email: 'chen@huasheng.example.com',
+  lastFour: '4321',
+  amountPaid: 480000,
+  repCode: 'e007',
+};
+
+describe('TwentyRestBackend 退款（Order/Refund 自定义对象）', () => {
+  it('getOrder：按 name 客户端匹配 → 统一行结构，owner_id 取 repCode', async () => {
+    const { fetchImpl, requests } = makeFetch([{ json: { data: { orders: [ORDER] } } }]);
+    const row = await repBackend(fetchImpl).getOrder('ord-1001');
+    expect(requests[0]?.url).toBe('https://crm.example.com/rest/orders');
+    expect(row).toEqual({
+      order_id: 'ord-1001',
+      account_id: '',
+      email: 'chen@huasheng.example.com',
+      last_four: '4321',
+      amount_paid: 480000,
+      currency: 'CNY',
+      owner_id: 'e007',
+    });
+  });
+
+  it('getOrder 查无此单 → null', async () => {
+    const { fetchImpl } = makeFetch([{ json: { data: { orders: [ORDER] } } }]);
+    expect(await repBackend(fetchImpl).getOrder('ord-9999')).toBeNull();
+  });
+
+  it('issueRefund 核验通过 → POST /refunds，归属随订单盖 repCode', async () => {
+    const { fetchImpl, requests } = makeFetch([
+      { json: { data: { orders: [ORDER] } } },
+      { json: { data: { createRefund: { id: 'rf-9' } } } },
+    ]);
+    const res = await repBackend(fetchImpl).issueRefund({
+      order_id: 'ord-1001',
+      email: 'chen@huasheng.example.com',
+      last_four: '4321',
+      amount: 200,
+    });
+    expect(requests[1]?.method).toBe('POST');
+    expect(requests[1]?.url).toBe('https://crm.example.com/rest/refunds');
+    const body = requests[1]?.body as Record<string, unknown>;
+    expect(body.repCode).toBe('e007');
+    expect(body.orderCode).toBe('ord-1001');
+    expect(body.amount).toBe(200);
+    expect(body.status).toBe('issued');
+    expect(res).toMatchObject({
+      refund_id: 'rf-9',
+      order_id: 'ord-1001',
+      amount: 200,
+      status: 'issued',
+      owner_id: 'e007',
+    });
+  });
+
+  it('issueRefund 卡尾号对不上 → 抛错，且不发 POST', async () => {
+    const { fetchImpl, requests } = makeFetch([{ json: { data: { orders: [ORDER] } } }]);
+    await expect(
+      repBackend(fetchImpl).issueRefund({
+        order_id: 'ord-1001',
+        email: 'chen@huasheng.example.com',
+        last_four: '0000',
+        amount: 200,
+      }),
+    ).rejects.toThrow('身份核验');
+    expect(requests).toHaveLength(1); // 只有 GET，没有 POST
+  });
+
+  it('issueRefund 金额超过已付 → 抛错', async () => {
+    const { fetchImpl } = makeFetch([{ json: { data: { orders: [ORDER] } } }]);
+    await expect(
+      repBackend(fetchImpl).issueRefund({
+        order_id: 'ord-1001',
+        email: 'chen@huasheng.example.com',
+        last_four: '4321',
+        amount: 999_999_999,
+      }),
+    ).rejects.toThrow('超过订单已付');
+  });
+
+  it('refundCountThisMonth：按 repCode + 本月 createdAt 计数', async () => {
+    const thisMonth = new Date().toISOString();
+    const refunds = [
+      { repCode: 'e007', createdAt: thisMonth },
+      { repCode: 'e007', createdAt: thisMonth },
+      { repCode: 'e008', createdAt: thisMonth }, // 别人的
+      { repCode: 'e007', createdAt: '2020-01-01T00:00:00.000Z' }, // 上个月
+    ];
+    const { fetchImpl } = makeFetch([{ json: { data: { refunds } } }]);
+    expect(await repBackend(fetchImpl).refundCountThisMonth('e007')).toBe(2);
+  });
+});
