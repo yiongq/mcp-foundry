@@ -159,6 +159,12 @@ export function createFoundryServer(options: FoundryServerOptions): Server {
   }));
   const serverInfo = { name: options.name ?? 'mcp-foundry', version: options.version ?? '0.0.1' };
 
+  // 轻量可观测：HTTP 计数 + 就绪探针 + Prometheus /metrics。够外部 uptime/告警接入，
+  // 又不往守卫里塞埋点（审计才是权威事件流）。探针请求不刷访问日志，避免 HEALTHCHECK 刷屏。
+  const bootedAt = Date.now();
+  let httpTotal = 0;
+  let http5xx = 0;
+
   const buildMcpServer = (principal: Principal): McpServer => {
     const mcp = new McpServer(serverInfo);
     for (const { adapter, guard, spec } of allowedToolEntries(systems, principal)) {
@@ -325,12 +331,80 @@ export function createFoundryServer(options: FoundryServerOptions): Server {
     await transport.handleRequest(req, res, body);
   };
 
+  const isProbe = (path: string): boolean =>
+    path === '/healthz' || path === '/readyz' || path === '/metrics';
+
+  // 就绪探针：存活（/healthz）之外再暴露「依赖是否可用」。token-jwks 模式下探一次密钥加载，
+  // 加载器 fail-closed（陈旧/首拉失败）即 503——此前 /healthz 恒 200 会掩盖「活着但验不了签」。
+  const handleReady = (res: ServerResponse): void => {
+    if (auth.mode === 'token-jwks') {
+      try {
+        if (typeof auth.jwks === 'function') auth.jwks();
+      } catch (err) {
+        sendJson(res, 503, {
+          ok: false,
+          reason: 'jwks_unavailable',
+          message: err instanceof Error ? err.message : String(err),
+        });
+        return;
+      }
+    }
+    sendJson(res, 200, { ok: true });
+  };
+
+  // Prometheus 文本格式：请求量/5xx/常驻内存/运行时长——够接 uptime 监控与告警。
+  const handleMetrics = (res: ServerResponse): void => {
+    const lines = [
+      '# HELP foundry_uptime_seconds Process uptime in seconds.',
+      '# TYPE foundry_uptime_seconds gauge',
+      `foundry_uptime_seconds ${Math.floor((Date.now() - bootedAt) / 1000)}`,
+      '# HELP foundry_http_requests_total Total HTTP requests handled.',
+      '# TYPE foundry_http_requests_total counter',
+      `foundry_http_requests_total ${httpTotal}`,
+      '# HELP foundry_http_server_errors_total HTTP responses with status >= 500.',
+      '# TYPE foundry_http_server_errors_total counter',
+      `foundry_http_server_errors_total ${http5xx}`,
+      '# HELP foundry_resident_memory_bytes Resident set size in bytes.',
+      '# TYPE foundry_resident_memory_bytes gauge',
+      `foundry_resident_memory_bytes ${process.memoryUsage().rss}`,
+    ];
+    res.writeHead(200, { 'content-type': 'text/plain; version=0.0.4' });
+    res.end(`${lines.join('\n')}\n`);
+  };
+
   return createServer((req, res) => {
+    const reqStart = Date.now();
+    httpTotal += 1;
+    const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+    res.on('finish', () => {
+      if (res.statusCode >= 500) http5xx += 1;
+      if (isProbe(path)) return; // 探针不刷访问日志，避免 HEALTHCHECK 刷屏
+      // 结构化访问日志：单行 JSON，便于采集；不含 body/请求头，无 PII 面
+      process.stdout.write(
+        `${JSON.stringify({
+          t: new Date().toISOString(),
+          lvl: 'info',
+          ev: 'http',
+          method: req.method,
+          path,
+          status: res.statusCode,
+          ms: Date.now() - reqStart,
+        })}\n`,
+      );
+    });
     void (async () => {
-      const path = new URL(req.url ?? '/', 'http://localhost').pathname;
       if (path === '/healthz') {
+        // 存活探针：进程在跑就 200（不查依赖）——容器 HEALTHCHECK 用它，避免依赖抖动触发重启循环
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end('{"ok":true}');
+        return;
+      }
+      if (path === '/readyz') {
+        handleReady(res);
+        return;
+      }
+      if (path === '/metrics') {
+        handleMetrics(res);
         return;
       }
       if (path === '/approvals' || path.startsWith('/approvals/')) {

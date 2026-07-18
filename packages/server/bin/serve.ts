@@ -145,6 +145,12 @@ const server = createFoundryServer({
 });
 
 const port = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3100;
+
+// 运行时护栏：显式设超时，别吃 Node 默认（requestTimeout 300s）——慢速/挂起连接不白占容量。
+server.requestTimeout = 30_000;
+server.headersTimeout = 15_000;
+server.keepAliveTimeout = 20_000;
+
 server.listen(port, () => {
   console.log(`mcp-foundry: http://localhost:${port}/mcp`);
   console.log(`crm backend: twenty（${process.env.TWENTY_API_URL ? 'REST 真库' : 'fixture'}）`);
@@ -158,3 +164,28 @@ server.listen(port, () => {
     console.log(identityBanner);
   }
 });
+
+// 优雅关闭：容器 stop/redeploy 发 SIGTERM。Dockerfile 直接 exec node（serve.ts 即 PID1），
+// 信号能收到——停止收新连接、放行在途请求、到点强制退出，别把在途写/审计追加截断成半行。
+let shuttingDown = false;
+const shutdown = (signal: string): void => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal} received — draining in-flight requests, then exiting`);
+  const forced = setTimeout(() => {
+    console.error('graceful shutdown timed out (10s) — forcing exit');
+    process.exit(1);
+  }, 10_000);
+  forced.unref();
+  server.close((err) => {
+    if (err) {
+      console.error('server.close error:', err.message);
+      process.exit(1);
+    }
+    clearTimeout(forced);
+    console.log('stopped accepting connections — bye');
+    process.exit(0);
+  });
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

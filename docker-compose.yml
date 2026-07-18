@@ -14,8 +14,8 @@ services:
     image: mcp-foundry-server
     environment:
       PORT: "3100"
-      # 生产铁律：必须设密钥（token 模式）。缺失时服务会以 demo 头模式启动
-      # ——smoke.sh 的"伪造头必须 401"探针会当场揪出这种错误部署。
+      # 生产铁律：必须设签名身份。缺失时 serve 直接拒绝启动（fail-closed，不再落回头模式）；
+      # :? 再加一道——.env 没填这个连 compose 都起不来。smoke.sh 的"伪造头必须 401"探针兜底。
       FOUNDRY_IDENTITY_SECRET: "${FOUNDRY_IDENTITY_SECRET:?set in .env — never commit}"
       # 可选：设了即切 token-jwks（ES256/RS256）。http(s):// 走 URL 定时拉取，
       # 否则按容器内文件路径。与 SECRET 同设时 JWKS 生效（HS256 令牌作废）——
@@ -36,6 +36,18 @@ services:
     volumes:
       - "foundry-audit:/app/audit"
     restart: unless-stopped
+    # 资源上限：单容器泄漏/被打不至于拖垮整机（同机还跑 Twenty 与别的栈）。
+    mem_limit: 512m
+    cpus: 1.0
+    # 纵深加固：容器内进程不再需要新增能力（镜像已非 root + tini）。
+    security_opt:
+      - no-new-privileges:true
+    # 日志轮转：stdout（含结构化 JSON 访问日志）不无限增长撑爆磁盘。
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 volumes:
   foundry-audit:
