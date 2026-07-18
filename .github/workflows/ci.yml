@@ -22,6 +22,24 @@ jobs:
       - run: pnpm lint
       - run: pnpm -r typecheck
       - run: pnpm -r test
+      # 安全内核覆盖率门禁（阈值在 packages/core/vitest.config.ts）——一处未测分支最危险
+      - run: pnpm --filter @yiong/foundry-core exec vitest run --coverage
+
+  python-client:
+    # LangGraph 客户端此前完全不进 CI——整条框架绑定可能悄悄回归。ruff + pytest 门住它。
+    # test_live_gateway.py 未设 FOUNDRY_TEST_LIVE 时自跳过，CI 里不需要外部网关。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/langgraph
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: pytest -q
 
   eval-gate:
     runs-on: ubuntu-latest

@@ -19,3 +19,4 @@ config/identity.feishu.yaml
 # 本地验证截图（playwright）
 verify-*.png
 .playwright-mcp/
+coverage/
