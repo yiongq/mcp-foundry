@@ -49,9 +49,26 @@ REST 后端**已对真实自托管 Twenty 实例端到端验证**（线上 crm.y
 
 部署时按工作区对齐（线上已按此配好）：
 - **owner/归属**：Twenty 默认没有「负责人」内建字段。`owner_id` 映射到可配置字段
-  （`TWENTY_OWNER_FIELD`，线上用 `accountOwnerId`）——真库需在 People/Companies/Opportunities
-  建对应字段，否则归属为空、行级过滤会「宁可错拒」。fixture 后端不受此限（自带 owner_id）。
+  （`TWENTY_OWNER_FIELD`）。**线上用自定义 TEXT 字段 `repCode`**（值即令牌里的 userId，如 `e007`）——
+  给 Company/Person/Opportunity/Order/Refund 各加一个 `repCode`，令牌 userId 与之比对做行级过滤。
+  （早期用内建关系字段 `accountOwnerId`，但它是 workspaceMember UUID、与「员工号」口径对不上，
+  且默认样例数据归属为空 → 换 `repCode` 后 sales_rep 行过滤才真在真库上生效。）
 - **商机阶段枚举**：Twenty 默认阶段（NEW/SCREENING/…）与工作区可能不同，真库需把
   `update_opportunity_stage` 的枚举与实际阶段对齐。
 - **创建归属**：`create_contact` 从 principal 盖 `owner_id` 到归属字段；Twenty 另有 `createdBy`
   系统字段不可写，两者语义需按工作区约定对齐。
+
+## 退款：Twenty 自定义对象 Order / Refund（真库已跑通）
+
+Twenty 无内置「订单/退款」对象，故建两个**自定义对象**承载 `issue_refund`（线上真库端到端验证）：
+
+| 自定义对象 | 字段（除内建 `id`/`name`/`createdAt`） | 说明 |
+| --- | --- | --- |
+| `order`（orders） | `email` · `lastFour` · `amountPaid`(NUMBER) · `repCode` | `name` 存订单号（ord-1001）；`email`+`lastFour` 是退款身份核验凭据 |
+| `refund`（refunds） | `orderCode` · `amount`(NUMBER) · `status` · `repCode` | `issue_refund` 成功即建一条，归属随订单盖 `repCode` |
+
+建法（一次性，元数据 REST API）：`POST /rest/metadata/objects` 建对象，`POST /rest/metadata/fields`
+逐个加字段（`{name,label,type:TEXT|NUMBER,objectMetadataId}`）。数据读写走 `/rest/orders`、`/rest/refunds`。
+REST 后端按 `name` 客户端匹配订单（记录数小，不依赖 Twenty 的 `filter` 语法）；`refundCountThisMonth`
+按 `repCode` + 本月 `createdAt` 计数供频次分级。真实 Twenty 校验手机号（libphonenumber），种子联系人
+电话需合法格式（带 `+86`）。
