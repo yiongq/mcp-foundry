@@ -60,6 +60,27 @@ CRM 写工具里改/删/改阶段涉人工审批。链路：模型调涉审工�
 可选 `FEISHU_APPROVAL_CHAT_ID` 指定审批卡片投递会话（缺省发到触发对话本身）。
 审批单据落 `audit/approvals.feishu.jsonl`（与网关进程的单据各管各的）。
 
+## 飞书「只当审批人」（relay 模式）
+
+上面的 `bot.ts` 是**自成一体**的聊天+审批 bot（自己发起、自己出卡、自己的审批库）。
+若要飞书**只做网页网关（packages/server）请求的审批人**——网页=发起人、飞书=独立审批人——
+用 relay 模式（`relay.ts` + `bin/serve-approver.ts`）：
+
+```bash
+FEISHU_APPROVAL_CHAT_ID=<审批人会话> \
+FOUNDRY_GATEWAY_URL=http://127.0.0.1:3100 \
+FOUNDRY_APPROVER_USER=e005 FOUNDRY_APPROVER_ROLE=sales_manager \
+pnpm --filter @yiong/foundry-feishu run serve-approver
+# 生产改用 FOUNDRY_APPROVER_TOKEN=<签名令牌>
+```
+
+链路：relay 轮询网关 `GET /approvals` 拿待审批单 → 发飞书卡片 → 审批人点批 →
+relay 回传 `POST /approvals/{id}`（以审批人身份）→ 网关落库。**relay 不聊天、不嵌网关、
+不落自己的库、不执行**——网关是唯一真源，执行仍由发起人在网页侧重试消票完成。职责分离由
+网关代码级 self-approval 不变量兜底（`principal.userId===record.userId → 403`）。
+
+> 注：网页在提交 pending 后自动感知「批复结果并续跑执行」尚未闭环（web 侧轮询/重试），是下一步。
+
 ## 模块
 
 | 文件 | 职责 |
@@ -70,3 +91,4 @@ CRM 写工具里改/删/改阶段涉人工审批。链路：模型调涉审工�
 | `agent.ts` | 系统提示词 + 工具执行编排（拒答如实转述、不越权补数；pending 结果旁路给 bot 出卡片） |
 | `approval.ts` | 审批卡片构造 + `card.action.trigger` 回调处理（审批人校验、批复落库、卡片翻面、批准后自动续跑） |
 | `bot.ts` | 长连接接入；处理中用表情回应反馈（答完摘掉，零残留），答案作为新消息发出以触发自动滚屏；单聊不开线程，群聊保留引用回复；订阅 cardAction 驱动审批 |
+| `relay.ts` | 「飞书只当审批人」：轮询网页网关待审批单发卡、把批复回传网关（不聊天/不执行）；纯逻辑，单测覆盖 |

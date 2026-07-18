@@ -132,7 +132,7 @@ export function summarizeResult(result: GuardedResult): string {
   return `执行出错：${result.message}`;
 }
 
-function parseActionValue(
+export function parseActionValue(
   value: unknown,
 ): { approvalId: string; decision: 'approve' | 'deny' } | null {
   // v2 回调 value 是对象；有些通道会给 JSON 字符串——两种都接
