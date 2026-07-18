@@ -13,9 +13,7 @@ import type {
 const CURRENCY = 'CNY';
 
 /**
- * 演示与评测数据——刻意与 adapter-espocrm 的 fixture 逐值相同：
- * 让「换 CRM 后端」成为真·透明替换，同一批题面、同一个演示在两个后端上行为一致。
- * 数值被评测题面引用，不要改动。身份沿用公司统一员工号命名空间。
+ * 演示与评测数据（fixture 后端用，真库走 REST）。数值被评测题面引用，不要改动。身份沿用公司统一员工号命名空间。
  */
 export const FIXTURE_OWNERS: Readonly<Record<string, string>> = {
   e005: '王五',
@@ -179,7 +177,7 @@ export const FIXTURE_OPPORTUNITIES: readonly OpportunityRow[] = [
 
 /**
  * 实例态写：构造时深拷贝模块级常量，写入只动自己那份——模块级 FIXTURE_* 永不被改，
- * 每个测试/评测用例各建各的，互不串扰。与 adapter-espocrm 的 FixtureBackend 同款。
+ * 每个测试/评测用例各建各的，互不串扰。
  */
 export class FixtureBackend implements TwentyBackend {
   private readonly accounts: AccountDetail[] = FIXTURE_ACCOUNTS.map((a) => ({ ...a }));

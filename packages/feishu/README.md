@@ -11,7 +11,7 @@
   没有 `get_salary`。安全发生在模型看到工具之前，而非调用被拒之后。
 - **守卫兜底**：模型选的每次工具调用都过 `packages/core` 的 Guard（行级过滤、
   字段脱敏、结构化拒答、审计）。拒答分支没有 data 字段，模型想编也没材料。
-- **多系统**：HR（OrangeHRM）、CRM（EspoCRM）与记忆（跨会话）三个域各自 RBAC——
+- **多系统**：HR（OrangeHRM）、CRM（Twenty）与记忆（跨会话）三个域各自 RBAC——
   业务全权 ≠ 记忆全权，且角色不跨域（hr_admin 的通配进不了 CRM，sales_* 也进不了 HR）。
 
 ## 跑起来
@@ -26,7 +26,7 @@ cp packages/feishu/.env.example packages/feishu/.env                 # 填凭据
 # FEISHU_APP_ID / FEISHU_APP_SECRET
 # FOUNDRY_LLM_BASE_URL / _API_KEY / _MODEL（OpenAI 兼容，如智谱 glm-4.6）
 # ORANGEHRM_MYSQL_*（可选：有则 HR 走真库，否则 fixture）
-# ESPOCRM_MYSQL_*（可选：有则 CRM 走真库，否则 fixture）
+# TWENTY_API_*（可选：有则 CRM 走真实 Twenty REST，否则 fixture）
 # 3. 启动（长连接，无需公网回调）
 pnpm --filter @yiong/foundry-feishu serve
 ```

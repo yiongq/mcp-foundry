@@ -60,10 +60,10 @@
         </div>
       </div>
       <div style="padding:13px 22px;border-top:1px solid var(--border-subtle);display:flex;gap:20px;flex-wrap:wrap;font-size:13px;background:var(--bg-base)">
-        <span style="color:var(--fg-muted)">真实链接(Dify · 免注册):</span>
-        <a href="https://dify.yiongspace.com/chat/kg6XFb18BoBfzHj2">员工视角 ↗</a>
-        <a href="https://dify.yiongspace.com/chat/CP3QrYkheA2Zz6P5">HR 视角 ↗</a>
-        <span style="color:var(--fg-faint);font-family:var(--font-mono);font-size:11.5px;margin-left:auto">同一地址 · 仅令牌不同</span>
+        <span style="color:var(--fg-muted)">线上体验(免注册):</span>
+        <a href="https://crm.yiongspace.com">CRM 助手 ↗</a>
+        <a href="https://twenty.yiongspace.com">Twenty 后台 ↗</a>
+        <span style="color:var(--fg-faint);font-family:var(--font-mono);font-size:11.5px;margin-left:auto">LangGraph 前端 · 真 Twenty 数据</span>
       </div>
     </div>
   </div>
@@ -107,7 +107,7 @@
         <div class="grid-2s" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-panel)">
             <div style="color:var(--fg-strong);margin-bottom:6px">MCP 客户端</div>
-            <div style="color:var(--fg-faint);font-size:11px;line-height:1.6">Claude Code / Dify / 任意 Streamable HTTP host · Bearer 签名令牌</div>
+            <div style="color:var(--fg-faint);font-size:11px;line-height:1.6">LangGraph / Claude Code / 任意 Streamable HTTP host · Bearer 签名令牌</div>
           </div>
           <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-panel)">
             <div style="color:var(--fg-strong);margin-bottom:6px">飞书 bot</div>
@@ -126,8 +126,8 @@
             <div style="color:var(--fg-faint);font-size:11px">HR · 真实 5.7 已验</div>
           </div>
           <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--bg-panel)">
-            <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">espocrm</div>
-            <div style="color:var(--fg-faint);font-size:11px">CRM · 真实 9.3 已验</div>
+            <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">twenty</div>
+            <div style="color:var(--fg-faint);font-size:11px">CRM · 真实 REST 已上线</div>
           </div>
           <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--bg-panel)">
             <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">memory</div>
@@ -274,8 +274,8 @@ pnpm --filter @yiong/foundry-server serve
       <p style="color:var(--fg-muted);margin:12px 0 0;max-width:640px">安全产品最怕过度承诺。以下边界与 README 保持同步:</p>
     </div>
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px 32px;font-size:13.5px;line-height:1.8;color:var(--fg-muted)">
-      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>双真库(OrangeHRM 5.7 / EspoCRM 9.3,只读 MySQL)读路径全绿——指本地 docker、演示数据口径,<b style="color:var(--fg-strong)">不是生产环境</b>(审批写路径的真库复验待做)</span></div>
-      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>线上跑 fixture 后端(演示数据),不连真实 HR/CRM 系统</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>两条真库链路都已验证:HR 对真实 OrangeHRM 5.7(只读 MySQL,本地 docker),CRM 对真实 Twenty(REST + Bearer)——都是<b style="color:var(--fg-strong)">演示数据口径</b>,不是生产规模</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>线上 CRM 域连的是<b style="color:var(--fg-strong)">真实 Twenty</b>(crm.yiongspace.com 读写真数据);HR 域线上仍走 fixture</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>体验链接的身份是<b style="color:var(--fg-strong)">配好的</b>,不是登录来的——演示「同一网关、不同身份、行为不同」,不是登录系统</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>行级/字段规则只在 Guard 出口生效;绕过 Foundry 直连源系统管不到——源系统凭据只发给 Foundry</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>JWKS URL 模式默认可用性优先:端点持续故障期间吊销不生效,fail-closed 需自行开启 max-stale</span></div>
@@ -300,9 +300,9 @@ pnpm --filter @yiong/foundry-server serve
         <div style="display:flex;flex-direction:column">
           <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">HR 域 + Guard 管线</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">真库已验</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">角色白名单 / 行级过滤 / 字段脱敏 / 审计 JSONL；对真实 OrangeHRM 5.7 只读 MySQL 全绿。</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">记忆域（跨会话，域内 RBAC）</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">越权召回走行级规则兜底；投毒防线是接口级——save_memory 根本没有 employee_id 参数。</div></div></div>
-<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">CRM 域（espocrm 适配器）</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">同一套用例 schema 迁移一次写成全绿；对真实 EspoCRM 9.3 同样全绿，角色不跨域。</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">CRM 域（twenty 适配器，已上公网）</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">同一套用例 schema 换适配器即全绿；线上网关连真实 Twenty（REST + Bearer），角色不跨域。</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">签名身份：HS256 → JWKS → URL 拉取</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">线上已切</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">ES256/RS256 多签发方 + 热轮换；线上实例现跑 JWKS URL 模式，私钥永不落服务器。</div></div></div>
-<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">飞书 bot 三域端到端 + Dify 公网</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">真实飞书应用实测脱敏/拒答/审计；Dify 双身份体验链接上公网，免注册可试。</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">飞书 bot 三域端到端 + LangGraph 公网</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">真实飞书应用实测脱敏/拒答/审计；自建 LangGraph 前端上公网，连真实 Twenty，免注册可试。</div></div></div>
         </div>
       </div>
       <div>
@@ -380,10 +380,10 @@ pnpm --filter @yiong/foundry-server serve
         </div>
       </div>
       <div style="padding:13px 22px;border-top:1px solid var(--border-subtle);display:flex;gap:20px;flex-wrap:wrap;font-size:13px;background:var(--bg-base)">
-        <span style="color:var(--fg-muted)">Real links (Dify · no signup):</span>
-        <a href="https://dify.yiongspace.com/chat/kg6XFb18BoBfzHj2">Employee view ↗</a>
-        <a href="https://dify.yiongspace.com/chat/CP3QrYkheA2Zz6P5">HR view ↗</a>
-        <span style="color:var(--fg-faint);font-family:var(--font-mono);font-size:11.5px;margin-left:auto">same endpoint · only the token differs</span>
+        <span style="color:var(--fg-muted)">Live (no signup):</span>
+        <a href="https://crm.yiongspace.com">CRM assistant ↗</a>
+        <a href="https://twenty.yiongspace.com">Twenty admin ↗</a>
+        <span style="color:var(--fg-faint);font-family:var(--font-mono);font-size:11.5px;margin-left:auto">LangGraph frontend · real Twenty data</span>
       </div>
     </div>
   </div>
@@ -427,7 +427,7 @@ pnpm --filter @yiong/foundry-server serve
         <div class="grid-2s" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-panel)">
             <div style="color:var(--fg-strong);margin-bottom:6px">MCP clients</div>
-            <div style="color:var(--fg-faint);font-size:11px;line-height:1.6">Claude Code / Dify / any Streamable HTTP host · Bearer signed tokens</div>
+            <div style="color:var(--fg-faint);font-size:11px;line-height:1.6">LangGraph / Claude Code / any Streamable HTTP host · Bearer signed tokens</div>
           </div>
           <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-panel)">
             <div style="color:var(--fg-strong);margin-bottom:6px">Feishu bot</div>
@@ -446,8 +446,8 @@ pnpm --filter @yiong/foundry-server serve
             <div style="color:var(--fg-faint);font-size:11px">HR · real 5.7 verified</div>
           </div>
           <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--bg-panel)">
-            <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">espocrm</div>
-            <div style="color:var(--fg-faint);font-size:11px">CRM · real 9.3 verified</div>
+            <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">twenty</div>
+            <div style="color:var(--fg-faint);font-size:11px">CRM · real REST, live</div>
           </div>
           <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--bg-panel)">
             <div style="color:var(--fg-strong);font-size:12px;margin-bottom:4px">memory</div>
@@ -594,8 +594,8 @@ pnpm --filter @yiong/foundry-server serve
       <p style="color:var(--fg-muted);margin:12px 0 0;max-width:640px">Overpromising is the worst failure mode for a security product. These limits stay in sync with the README:</p>
     </div>
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px 32px;font-size:13.5px;line-height:1.8;color:var(--fg-muted)">
-      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>read paths green against both real DBs (OrangeHRM 5.7 / EspoCRM 9.3, read-only MySQL) — local docker, demo-scale data, <b style="color:var(--fg-strong)">not production</b> (approval write path not yet re-verified against real DB)</span></div>
-      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>The live instance runs the fixture backend (demo data), not a real HR/CRM system</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>both real backends verified: HR against real OrangeHRM 5.7 (read-only MySQL, local docker), CRM against real Twenty (REST + Bearer) — <b style="color:var(--fg-strong)">demo-scale data</b>, not production scale</span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>The live CRM domain runs <b style="color:var(--fg-strong)">real Twenty</b> (crm.yiongspace.com reads/writes real data); the HR domain stays on fixture online</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>Demo identities are <b style="color:var(--fg-strong)">pre-configured</b>, not logged in — it demonstrates "same gateway, different identity, different behavior", not a login system</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>Row/field rules apply only at the guard's exit; bypassing Foundry to hit the source system directly is out of scope — source credentials go to Foundry only</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>JWKS URL mode defaults to availability-first: during a prolonged endpoint outage revocation doesn't take effect; fail-closed requires opting into max-stale</span></div>
@@ -620,9 +620,9 @@ pnpm --filter @yiong/foundry-server serve
         <div style="display:flex;flex-direction:column">
           <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">HR domain + Guard pipeline</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">real DB verified</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Role whitelist / row filtering / field masking / audit JSONL; green against real OrangeHRM 5.7 over read-only MySQL.</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Memory domain (cross-session, in-domain RBAC)</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Unauthorized recall blocked by row rules; poisoning defended at the interface — save_memory has no employee_id parameter at all.</div></div></div>
-<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">CRM domain (espocrm adapter)</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Same case schema migrated green on the first pass; also green against real EspoCRM 9.3. Roles never cross domains.</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">CRM domain (twenty adapter, now public)</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Same case schema green after just swapping the adapter; the live gateway talks to real Twenty (REST + Bearer). Roles never cross domains.</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Signed identity: HS256 → JWKS → URL fetch</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">live</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">ES256/RS256 multi-issuer with hot rotation; the live instance runs JWKS URL mode — private keys never touch the server.</div></div></div>
-<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Feishu bot ×3 domains + Dify public</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Masking / refusals / audit tested on a real Feishu app; dual-identity Dify demo links live, no signup.</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Feishu bot ×3 domains + LangGraph public</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Masking / refusals / audit tested on a real Feishu app; a self-built LangGraph frontend is live against real Twenty, no signup.</div></div></div>
         </div>
       </div>
       <div>

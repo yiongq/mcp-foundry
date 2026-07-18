@@ -1,0 +1,12 @@
+# LangGraph 前端的独立部署（与网关同机，直连宿主机 127.0.0.1:3100 网关）。
+# network_mode host：容器共享宿主网络——既能连网关 loopback，自身也把 8100 绑在
+# 宿主 loopback 上，Caddy 直接 reverse_proxy 127.0.0.1:8100。
+# .env（含令牌与 GLM key）由 env_file 注入，不进镜像（.dockerignore 已排除）。
+name: foundry-langgraph
+services:
+  langgraph-client:
+    build: .
+    image: foundry-langgraph-client
+    network_mode: host
+    env_file: .env
+    restart: unless-stopped

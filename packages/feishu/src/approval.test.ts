@@ -21,7 +21,7 @@ const IDENTITIES = {
 
 async function seedRecord(store: MemoryApprovalStore): Promise<ApprovalRecord> {
   const record = await store.create({
-    system: 'espocrm',
+    system: 'twenty',
     tool: 'delete_contact',
     args: { contact_id: 'c001' },
     argsHash: 'hash1',
@@ -49,7 +49,7 @@ function makeHarness(
   const sent: Harness['sent'] = [];
   const deps: ApprovalCardDeps = {
     store,
-    rbacBySystem: new Map([['espocrm', rbacCrm]]),
+    rbacBySystem: new Map([['twenty', rbacCrm]]),
     toolset: {
       invoke: async (principal, tool) => {
         invoked.push({ principal: { userId: principal.userId, role: principal.role }, tool });
@@ -130,7 +130,7 @@ describe('审批卡片', () => {
     expect((await h.store.get(record.id))?.status).toBe('pending');
     expect(h.invoked).toHaveLength(0);
     expect(h.sent[0]?.chatId).toBe('oc_approval');
-    expect(h.sent[0]?.markdown).toContain('不是 espocrm 域的审批人');
+    expect(h.sent[0]?.markdown).toContain('不是 twenty 域的审批人');
   });
 
   it('未绑定身份点按钮：提示绑定，不动单据', async () => {
@@ -177,7 +177,7 @@ describe('审批卡片', () => {
     const sent: Array<{ chatId: string; markdown: string }> = [];
     const deps: ApprovalCardDeps = {
       store,
-      rbacBySystem: new Map([['espocrm', rbacCrm]]),
+      rbacBySystem: new Map([['twenty', rbacCrm]]),
       toolset: {
         invoke: async (_p, tool) => {
           invoked.push({ tool });

@@ -1,12 +1,12 @@
 /**
- * 回归：真实 espocrm 适配器（含四个写工具）挂上 MCP server 后，tools/list 与
+ * 回归：真实 twenty 适配器（含四个写工具）挂上 MCP server 后，tools/list 与
  * tools/call 都不能 500。曾经 update_contact 的入参 schema 用了 .refine → ZodEffects，
  * 而 registry.toRawShape 只收 ZodObject，导致 buildMcpServer 注册时抛错、整个 CRM 域
  * （连读工具）全部 500。其余 server 测试用的是裸 z.object 的 fake adapter，抓不到这个。
  */
 import { readFile } from 'node:fs/promises';
 import type { Server } from 'node:http';
-import { createEspoCrmAdapter } from '@yiong/foundry-adapter-espocrm';
+import { createTwentyAdapter } from '@yiong/foundry-adapter-twenty';
 import { loadRbacConfig, MemoryApprovalStore, MemoryAuditLogger } from '@yiong/foundry-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createFoundryServer } from './server.js';
@@ -16,10 +16,10 @@ let baseUrl: string;
 
 beforeAll(async () => {
   const rbac = loadRbacConfig(
-    await readFile(new URL('../../../config/rbac.espocrm.yaml', import.meta.url), 'utf8'),
+    await readFile(new URL('../../../config/rbac.twenty.yaml', import.meta.url), 'utf8'),
   );
   server = createFoundryServer({
-    systems: [{ adapter: createEspoCrmAdapter({ env: {} }), rbac }],
+    systems: [{ adapter: createTwentyAdapter({ env: {} }), rbac }],
     audit: new MemoryAuditLogger(),
     approvals: new MemoryApprovalStore(),
   });
@@ -50,7 +50,7 @@ async function rpc(method: string, params: unknown, headers: Record<string, stri
 
 const REP = { 'x-foundry-user': 'e007', 'x-foundry-role': 'sales_rep' };
 
-describe('espocrm 写工具挂 MCP（ZodEffects 回归）', () => {
+describe('twenty 写工具挂 MCP（ZodEffects 回归）', () => {
   it('tools/list 不 500，且 sales_rep 看到 10 个工具（6 读 + 4 写）', async () => {
     const { status, body } = await rpc('tools/list', {}, REP);
     expect(status).toBe(200);

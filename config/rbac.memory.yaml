@@ -1,4 +1,4 @@
-# 记忆域 RBAC。与业务域（rbac.orangehrm.yaml / rbac.espocrm.yaml）刻意不同：
+# 记忆域 RBAC。与业务域（rbac.orangehrm.yaml / rbac.twenty.yaml）刻意不同：
 # 记忆是私人资产，所有角色一律只见自己的行——
 # hr_admin/sales_manager 在各自业务域全权，在记忆域同样受限（业务全权 ≠ 记忆全权）。
 # 这也是评测按系统分治 RBAC 的原因：一份全局角色表画不出这种边界。
