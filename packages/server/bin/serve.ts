@@ -10,11 +10,19 @@
  * URL 模式下 FOUNDRY_IDENTITY_JWKS_REFRESH（秒，默认 300）定刷新间隔——
  * 固定轮询、不读 Cache-Control；这个数就是吊销时延上界，配错拒绝启动。
  */
+import { createPrivateKey } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createOrangeHrmAdapter } from '@yiong/foundry-adapter-orangehrm';
 import { createTwentyAdapter } from '@yiong/foundry-adapter-twenty';
-import { JsonlApprovalStore, JsonlAuditLogger, loadRbacConfig } from '@yiong/foundry-core';
+import {
+  type AuditLogger,
+  JsonlApprovalStore,
+  JsonlAuditLogger,
+  loadRbacConfig,
+  SignedJsonlAuditLogger,
+} from '@yiong/foundry-core';
 import {
   type AuthConfig,
   createFoundryServer,
@@ -97,13 +105,30 @@ if (!(jwksSource && isJwksUrl(jwksSource)) && ignoredJwksTuning.length > 0) {
   );
 }
 
+// 审计后端：设了 FOUNDRY_AUDIT_SIGNING_KEY（Ed25519 私钥 PEM 路径）即开启防篡改
+// 签名哈希链——每条记录带 seq/prevHash/hash/sig，篡改断链、伪造验签不过，校验只需公钥
+// （verify-audit CLI）。不设则明文 JSONL（本地/演示够用，生产建议开启）。
+const auditPath = fileURLToPath(new URL('audit/foundry.jsonl', repoRoot));
+const auditKeyPath = process.env.FOUNDRY_AUDIT_SIGNING_KEY;
+let audit: AuditLogger;
+let auditBanner: string;
+if (auditKeyPath) {
+  const privateKey = createPrivateKey(readFileSync(auditKeyPath, 'utf8'));
+  audit = new SignedJsonlAuditLogger(auditPath, privateKey);
+  auditBanner =
+    'audit: Ed25519 签名哈希链（防篡改）；校验 pnpm --filter @yiong/foundry-server run verify-audit';
+} else {
+  audit = new JsonlAuditLogger(auditPath);
+  auditBanner = 'audit: 明文 JSONL（未签名——设 FOUNDRY_AUDIT_SIGNING_KEY 开启防篡改哈希链）';
+}
+
 // CRM 域走 Twenty 适配器（fixture 或真库 REST，由 TWENTY_API_* 决定）。
 const server = createFoundryServer({
   systems: [
     { adapter: createOrangeHrmAdapter(), rbac: await loadRbac('rbac.orangehrm.yaml') },
     { adapter: createTwentyAdapter(), rbac: await loadRbac('rbac.twenty.yaml') },
   ],
-  audit: new JsonlAuditLogger(fileURLToPath(new URL('audit/foundry.jsonl', repoRoot))),
+  audit,
   // 与审计同目录：复用同一个持久化卷与 rsync 排除规则。存 args 原文（续跑必需），同级对待
   approvals: new JsonlApprovalStore(fileURLToPath(new URL('audit/approvals.jsonl', repoRoot))),
   auth,
@@ -113,6 +138,7 @@ const port = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3100;
 server.listen(port, () => {
   console.log(`mcp-foundry: http://localhost:${port}/mcp`);
   console.log(`crm backend: twenty（${process.env.TWENTY_API_URL ? 'REST 真库' : 'fixture'}）`);
+  console.log(auditBanner);
   if (auth.mode === 'headers') {
     console.warn(
       'identity: DEMO trust headers x-foundry-user / x-foundry-role — unsigned, anyone can claim any role.',

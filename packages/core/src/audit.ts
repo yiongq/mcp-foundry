@@ -29,7 +29,11 @@ export function hashArgs(args: Record<string, unknown>): string {
   return createHash('sha256').update(canonicalJson(args)).digest('hex').slice(0, 16);
 }
 
-function canonicalJson(value: unknown): string {
+/**
+ * 键递归排序的规范化 JSON——同一份数据无论键序都得到同一串字节。
+ * 审计哈希链据此计算每条记录的 hash：验证方无需知道写入时的键序也能复算。
+ */
+export function canonicalJson(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   const entries = Object.entries(value as Record<string, unknown>)

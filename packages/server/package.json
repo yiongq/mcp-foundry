@@ -11,7 +11,9 @@
     "test": "vitest run",
     "serve": "node --import tsx bin/serve.ts",
     "mint-token": "node --import tsx bin/mint-token.ts",
-    "keygen": "node --import tsx bin/keygen.ts"
+    "keygen": "node --import tsx bin/keygen.ts",
+    "audit-keygen": "node --import tsx bin/audit-keygen.ts",
+    "verify-audit": "node --import tsx bin/verify-audit.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0",

@@ -283,3 +283,34 @@ curl -s -X POST https://foundry.yiongspace.com/approvals/<id> \
 无需公网 URL；可选 `FEISHU_APPROVAL_CHAT_ID` 指定审批卡片投递会话（缺省发到
 触发对话本身）。真库写通道：网关 `.env` 设 `TWENTY_API_URL` + `TWENTY_API_KEY`（§7）
 即从 fixture 切 Twenty REST，审批通过后的写落到真实 Twenty；不设时走 fixture。
+
+## 14. 防篡改审计（可选，签名哈希链）
+
+审计日志默认是明文 JSONL。设 `FOUNDRY_AUDIT_SIGNING_KEY` 即升级为 Ed25519 签名哈希链：
+每条记录带 `seq`/`prevHash`/`hash`/`sig`，改一条断整链、伪造验签不过，校验只需公钥、
+可离线复核。私钥属签发方（管理员本机）、绝不落服务器——与 JWKS 身份同一条纪律。
+
+```bash
+# ① 本机生成审计密钥对（私钥留本机 0600、绝不上服务器；公钥随日志分发给校验方）
+pnpm --filter @yiong/foundry-server run audit-keygen \
+  --out ~/.config/mcp-foundry/audit-ed25519.key \
+  --pub-out ~/.config/mcp-foundry/audit-ed25519.pub
+
+# ② 私钥上服务器（0600），.env 指到它，重建容器
+scp ~/.config/mcp-foundry/audit-ed25519.key root@<VPS_IP>:/opt/foundry-keys/
+#   .env: FOUNDRY_AUDIT_SIGNING_KEY=/opt/foundry-keys/audit-ed25519.key
+# docker compose up -d --force-recreate ；日志应见 "audit: Ed25519 签名哈希链（防篡改）"
+
+# ③ 校验（把日志拷回本机或在服务器上跑，只需公钥——校验方不碰私钥）
+pnpm --filter @yiong/foundry-server run verify-audit \
+  --file audit/foundry.jsonl --pubkey ~/.config/mcp-foundry/audit-ed25519.pub
+# 链完整 → "✓ 审计链完整：N 条记录…全部 Ed25519 验签通过" + 打印末条 hash、exit 0
+# 任一处被动过（改字段/删中间/重排/伪造）→ "✗ 审计链断裂 @ seq K：…"、exit 1
+```
+
+边界（诚实）：签名哈希链抓得住**篡改、插入、重排、删中间**（seq 跳号或 prevHash 断链），
+但**抓不住尾部截断**——删掉最近 K 条会留下一段更短却自洽的合法链。缓解：把 verify 打印的
+「末条 hash + 条数」定期外部锚定（另一处 append-only sink / 见证服务），校验时传
+`--expect-last <锚定值>`，末条对不上即判尾部截断。另：签名只保证「记下的没被动过」，不保证
+「所有该记的都记了」（进程在 `appendFile` 之前被杀的那条不落盘——链仍自洽，只是少一条）。
+私钥属签发方、`.key/.pem` 已被 .gitignore。
