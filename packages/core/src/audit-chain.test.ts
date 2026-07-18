@@ -64,6 +64,24 @@ describe('SignedJsonlAuditLogger + verifyAuditChain', () => {
     expect(result.brokenAt?.reason).toContain('hash 不匹配');
   });
 
+  it('崩溃留下残缺尾行 → 新实例截断残字节、从最后完整记录续链，不永久锁死', async () => {
+    const { file, keys } = await writeChain(3);
+    // 模拟断电：在最后一条完整记录后追加半行（无换行、非法 JSON）
+    const { appendFile } = await import('node:fs/promises');
+    await appendFile(file, '{"seq":99,"prevHash":"deadbeef","partial', 'utf8');
+
+    // 新实例接手：不应抛错（修复前 JSON.parse 会抛 → 缓存 rejected promise → 永久锁死），
+    // 应清掉残字节并从第 3 条续链
+    const logger = new SignedJsonlAuditLogger(file, keys.privateKey);
+    await logger.log(event('tool_after_crash'));
+
+    const records = parseSignedAuditLog(await readFile(file, 'utf8'));
+    expect(records.map((r) => r.seq)).toEqual([1, 2, 3, 4]); // 残行被丢弃，新记录续为 seq 4
+    expect(records[3]?.tool).toBe('tool_after_crash');
+    expect(records[3]?.prevHash).toBe(records[2]?.hash);
+    expect(verifyAuditChain(records, keys.publicKey)).toEqual({ ok: true, count: 4 });
+  });
+
   it('攻击者改字段并重算 hash（但无私钥）→ 签名验不过', async () => {
     const { keys, records } = await writeChain(3);
     const { createHash } = await import('node:crypto');

@@ -121,11 +121,21 @@ export class MemoryApprovalStore implements ApprovalStore {
     if (!record) throw new Error(`审批单不存在：${id}`);
     if (record.status !== 'pending') throw new Error(`审批单已是 ${record.status}，不能重复批复`);
     if (!isOpen(record, new Date())) throw new Error('审批单已过期');
+    // 同步抢占状态：检查与置位之间没有 await，单线程下无法交错，
+    // 并发的第二次 decide 会在上面的 status!=='pending' 处即抛错。落盘失败再回滚。
     const decidedAt = new Date().toISOString();
-    await this.persist({ type: 'decided', id, status, approverId, decidedAt });
     record.status = status;
     record.approverId = approverId;
     record.decidedAt = decidedAt;
+    try {
+      await this.persist({ type: 'decided', id, status, approverId, decidedAt });
+    } catch (err) {
+      // 回滚到批复前——此刻必为 pending 且尚无审批人/决定时间
+      record.status = 'pending';
+      delete record.approverId;
+      delete record.decidedAt;
+      throw err;
+    }
     return record;
   }
 
@@ -133,9 +143,17 @@ export class MemoryApprovalStore implements ApprovalStore {
     const record = this.records.get(id);
     if (!record) throw new Error(`审批单不存在：${id}`);
     if (record.consumedAt !== undefined) throw new Error('审批单已被消费');
+    // 同步抢占：检查与置位之间没有 await，单线程下无法交错——并发的第二次 consume
+    // 会在上面的 consumedAt 检查处即抛错，杜绝「一张已批准单被并发重放成多次执行」
+    // （一次人工审批被打款多次）。落盘失败则回滚，让这张单可被重试消费。
     const consumedAt = new Date().toISOString();
-    await this.persist({ type: 'consumed', id, consumedAt });
     record.consumedAt = consumedAt;
+    try {
+      await this.persist({ type: 'consumed', id, consumedAt });
+    } catch (err) {
+      delete record.consumedAt;
+      throw err;
+    }
     return record;
   }
 

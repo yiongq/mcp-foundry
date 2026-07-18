@@ -235,6 +235,23 @@ export function createFoundryServer(options: FoundryServerOptions): Server {
           decision === 'approve' ? 'approved' : 'denied',
           principal.userId,
         );
+        // 把审批决策写进（可能已签名的）审计链——否则「谁批准了这笔高危写」只存在
+        // 未签名的 approvals.jsonl 里，防篡改审计无法归因、也无法被离线校验器覆盖。
+        // argsHash 与后续放行执行的 ALLOW 记录同值，可据此关联「批准」与「执行」两条记录。
+        await options.audit.log({
+          ts: new Date().toISOString(),
+          userId: record.userId,
+          role: record.role,
+          system: record.system,
+          tool: record.tool,
+          decision: decision === 'approve' ? 'ALLOW' : 'DENY',
+          reason: decision === 'approve' ? 'approval_granted' : 'approval_denied',
+          rule: `approval:${record.id}`,
+          latencyMs: 0,
+          argsHash: record.argsHash,
+          approvalId: record.id,
+          approverId: principal.userId,
+        });
         sendJson(res, 200, approvalView(decided));
       } catch (err) {
         // decide 的状态校验竞态兜底（如恰好过期）

@@ -40,11 +40,12 @@ roles:
 let server: Server;
 let baseUrl: string;
 const store = new MemoryApprovalStore();
+const audit = new MemoryAuditLogger();
 
 beforeAll(async () => {
   server = createFoundryServer({
     systems: [{ adapter: fakeCrm, rbac }],
-    audit: new MemoryAuditLogger(),
+    audit,
     approvals: store,
   });
   await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -188,5 +189,31 @@ describe('审批闸门 HTTP 全链路', () => {
     });
     expect(selfDecide.status).toBe(403);
     expect((await store.get(own.id))?.status).toBe('pending'); // 硬校验拦在 decide 之前
+  });
+
+  it('审批决策写入审计日志：谁批/驳了哪张单（含 approverId + approvalId）', async () => {
+    const record = await store.create({
+      system: 'fake-crm',
+      tool: 'delete_contact',
+      args: { id: 'c-audit' },
+      argsHash: 'haudit',
+      userId: 'e007',
+      role: 'sales_rep',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const decide = await fetch(`${baseUrl}/approvals/${record.id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...MANAGER_HEADERS },
+      body: JSON.stringify({ decision: 'approve' }),
+    });
+    expect(decide.status).toBe(200);
+
+    const decisionEvent = audit.events.find((e) => e.approvalId === record.id);
+    expect(decisionEvent).toBeDefined();
+    expect(decisionEvent?.approverId).toBe('e005'); // 审批人身份进了审计链
+    expect(decisionEvent?.userId).toBe('e007'); // 发起人
+    expect(decisionEvent?.decision).toBe('ALLOW');
+    expect(decisionEvent?.reason).toBe('approval_granted');
+    expect(decisionEvent?.argsHash).toBe('haudit'); // 与后续放行执行的 ALLOW 记录同值可关联
   });
 });

@@ -270,6 +270,48 @@ describe('审批闸门', () => {
     await store.consume(record.id);
     await expect(store.consume(record.id)).rejects.toThrow('已被消费');
   });
+
+  it('并发消费同一张已批准单只成功一次（防重放 TOCTOU）', async () => {
+    const store = new MemoryApprovalStore();
+    const record = await store.create({
+      system: 's',
+      tool: 't',
+      args: {},
+      argsHash: 'h',
+      userId: 'u',
+      role: 'r',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    await store.decide(record.id, 'approved', 'boss');
+
+    // 同时发起两次消费：检查与置位间没有 await，只有一次能过 consumedAt 检查；
+    // 修复前两次都会在各自 await persist 前读到 consumedAt===undefined 而双双放行（重放打款）。
+    const results = await Promise.allSettled([store.consume(record.id), store.consume(record.id)]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    expect(rejected).toHaveLength(1);
+    expect(String(rejected[0]?.reason)).toContain('已被消费');
+  });
+
+  it('并发批复同一张单只成功一次', async () => {
+    const store = new MemoryApprovalStore();
+    const record = await store.create({
+      system: 's',
+      tool: 't',
+      args: {},
+      argsHash: 'h',
+      userId: 'u',
+      role: 'r',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+
+    const results = await Promise.allSettled([
+      store.decide(record.id, 'approved', 'boss'),
+      store.decide(record.id, 'denied', 'boss'),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+  });
 });
 
 // ── 分级审批（条件式 policy-as-code）───────────────────────────────────────

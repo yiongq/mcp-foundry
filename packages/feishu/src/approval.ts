@@ -1,4 +1,10 @@
-import type { ApprovalRecord, ApprovalStore, GuardedResult, RbacConfig } from '@yiong/foundry-core';
+import type {
+  ApprovalRecord,
+  ApprovalStore,
+  AuditLogger,
+  GuardedResult,
+  RbacConfig,
+} from '@yiong/foundry-core';
 import type { IdentityMap } from './identity.js';
 import { resolvePrincipal } from './identity.js';
 import type { GuardedToolset } from './toolset.js';
@@ -27,6 +33,9 @@ export interface ApprovalCardDeps {
   identityMap: () => Promise<IdentityMap>;
   updateCard: (messageId: string, card: Record<string, unknown>) => Promise<unknown>;
   send: (chatId: string, content: { markdown: string }) => Promise<unknown>;
+  /** 可选：把审批决策（谁批/驳了哪张单）写进审计日志——与网关 /approvals 一致，
+   * 让「谁批准了这笔高危写」不再只存在 approvals.jsonl。未配置则跳过。 */
+  audit?: AuditLogger;
 }
 
 const shortId = (id: string): string => id.slice(0, 8);
@@ -210,6 +219,22 @@ export async function handleCardAction(
     );
     return;
   }
+
+  // 审批决策入审计日志：谁批/驳了哪张高危单，argsHash 与后续放行执行的 ALLOW 记录同值可关联
+  await deps.audit?.log({
+    ts: new Date().toISOString(),
+    userId: decided.userId,
+    role: decided.role,
+    system: decided.system,
+    tool: decided.tool,
+    decision: decision === 'approved' ? 'ALLOW' : 'DENY',
+    reason: decision === 'approved' ? 'approval_granted' : 'approval_denied',
+    rule: `approval:${decided.id}`,
+    latencyMs: 0,
+    argsHash: decided.argsHash,
+    approvalId: decided.id,
+    approverId: operator.userId,
+  });
 
   await deps.updateCard(
     evt.messageId,

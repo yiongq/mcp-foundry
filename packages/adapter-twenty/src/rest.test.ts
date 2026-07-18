@@ -273,4 +273,56 @@ describe('TwentyRestBackend 退款（Order/Refund 自定义对象）', () => {
     const { fetchImpl } = makeFetch([{ json: { data: { refunds } } }]);
     expect(await repBackend(fetchImpl).refundCountThisMonth('e007')).toBe(2);
   });
+
+  it('issueRefund：POST /refunds 返 404（Refund 对象未配置）→ 抛错，绝不硬报成功', async () => {
+    // 核验/金额全过，但退款实体没落库——必须 fail-closed，不能把没发生的退款当 issued
+    const { fetchImpl, requests } = makeFetch([
+      { json: { data: { orders: [ORDER] } } },
+      { status: 404 },
+    ]);
+    await expect(
+      repBackend(fetchImpl).issueRefund({
+        order_id: 'ord-1001',
+        email: 'chen@huasheng.example.com',
+        last_four: '4321',
+        amount: 200,
+      }),
+    ).rejects.toThrow('未返回退款实体');
+    expect(requests).toHaveLength(2); // GET orders + POST refunds 都发了，但结果被拦
+  });
+
+  it('getOrder：翻页拉全量，命中落在后页的订单（首页不带参数，续页才带 cursor）', async () => {
+    const { fetchImpl, requests } = makeFetch([
+      {
+        json: {
+          data: { orders: [{ ...ORDER, name: 'ord-0001' }] },
+          pageInfo: { hasNextPage: true, endCursor: 'cur-1' },
+        },
+      },
+      { json: { data: { orders: [ORDER] }, pageInfo: { hasNextPage: false } } },
+    ]);
+    const row = await repBackend(fetchImpl).getOrder('ord-1001');
+    expect(row?.order_id).toBe('ord-1001');
+    expect(requests[0]?.url).toBe('https://crm.example.com/rest/orders');
+    expect(requests[1]?.url).toBe('https://crm.example.com/rest/orders?starting_after=cur-1');
+  });
+
+  it('refundCountThisMonth：跨页累计，不因只读首页而少算（否则绕过频次闸门）', async () => {
+    const thisMonth = new Date().toISOString();
+    const { fetchImpl } = makeFetch([
+      {
+        json: {
+          data: { refunds: [{ repCode: 'e007', createdAt: thisMonth }] },
+          pageInfo: { hasNextPage: true, endCursor: 'c1' },
+        },
+      },
+      {
+        json: {
+          data: { refunds: [{ repCode: 'e007', createdAt: thisMonth }] },
+          pageInfo: { hasNextPage: false },
+        },
+      },
+    ]);
+    expect(await repBackend(fetchImpl).refundCountThisMonth('e007')).toBe(2);
+  });
 });

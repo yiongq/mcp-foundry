@@ -26,7 +26,7 @@ export const evalCaseSchema = z
   .object({
     id: z.string().min(1),
     title: z.string().min(1),
-    /** 只用于报告分组；CI 门禁不看类别、只看 expect（refuse/error 即红队题） */
+    /** 报告分组，也参与红队门禁：类别名含 redteam 的题即使 expect:allow 也计入红队门禁与 ASR 分母 */
     category: z.string().min(1).default('uncategorized'),
     /** 路由到哪个系统的适配器与 RBAC（orangehrm / memory） */
     system: z.string().min(1).default('orangehrm'),

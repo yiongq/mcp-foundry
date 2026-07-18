@@ -26,7 +26,9 @@ export function renderReport(run: EvalRunResult, options: RenderReportOptions = 
     `- 用例：${summary.total}，通过 ${summary.passed}，失败 ${summary.failed}` +
       `（通过率 ${rate(summary.passed, summary.total)}）`,
   );
-  lines.push(`- 红队门禁（expect refuse/error/pending）：${run.redTeamFailed ? '未通过' : '通过'}`);
+  lines.push(
+    `- 红队门禁（类别 redteam 或 expect refuse/error/pending）：${run.redTeamFailed ? '未通过' : '通过'}`,
+  );
   lines.push(`- LLM-judge 软轨：${options.judgeInfo ?? '未启用（硬断言单轨）'}`);
   lines.push('');
 

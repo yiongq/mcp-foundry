@@ -1,5 +1,5 @@
 import { createLarkChannel, LoggerLevel } from '@larksuiteoapi/node-sdk';
-import type { ApprovalStore, RbacConfig } from '@yiong/foundry-core';
+import type { ApprovalStore, AuditLogger, RbacConfig } from '@yiong/foundry-core';
 import type { AgentOptions } from './agent.js';
 import { answer } from './agent.js';
 import { buildApprovalCard, handleCardAction } from './approval.js';
@@ -26,6 +26,8 @@ export interface BotConfig {
     store: ApprovalStore;
     rbacBySystem: ReadonlyMap<string, RbacConfig>;
     approvalChatId?: string;
+    /** 可选：把审批决策写进审计日志（同网关口径）。 */
+    audit?: AuditLogger;
   };
 }
 
@@ -145,6 +147,7 @@ export async function startBot(config: BotConfig): Promise<{ close: () => Promis
         {
           store: approvals.store,
           rbacBySystem: approvals.rbacBySystem,
+          ...(approvals.audit ? { audit: approvals.audit } : {}),
           toolset: config.agent.toolset,
           identityMap: async () =>
             typeof config.identityMap === 'function'
