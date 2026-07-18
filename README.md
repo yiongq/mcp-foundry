@@ -52,8 +52,10 @@ CRM 域开放写工具后补上第四道：**高危写操作人工审批（Human
 ┌────────────────────────────────────────────┐
 │ SystemAdapter：orangehrm（HR）              │    ERP …（路线图，今天没有）
 │   fixture / 只读 MySQL（真实 OrangeHRM 5.7） │
-│              ：espocrm（CRM）                │
-│   fixture / 只读 MySQL（真实 EspoCRM 9.3）   │
+│              ：CRM（后端可热切，同工具同守卫）│
+│   espocrm：fixture / 只读 MySQL（EspoCRM 9.3）│
+│   twenty ：fixture / REST（Twenty，Bearer）  │
+│   FOUNDRY_CRM_BACKEND=espocrm|twenty         │
 │              ：memory（跨会话记忆，域内 RBAC）│
 └────────────────────────────────────────────┘
 ```

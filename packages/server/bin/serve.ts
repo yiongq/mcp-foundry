@@ -14,6 +14,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createEspoCrmAdapter } from '@yiong/foundry-adapter-espocrm';
 import { createOrangeHrmAdapter } from '@yiong/foundry-adapter-orangehrm';
+import { createTwentyAdapter } from '@yiong/foundry-adapter-twenty';
 import { JsonlApprovalStore, JsonlAuditLogger, loadRbacConfig } from '@yiong/foundry-core';
 import {
   type AuthConfig,
@@ -97,10 +98,19 @@ if (!(jwksSource && isJwksUrl(jwksSource)) && ignoredJwksTuning.length > 0) {
   );
 }
 
+// CRM 后端可热切：FOUNDRY_CRM_BACKEND=twenty 换成 Twenty 适配器，其余全不动——
+// 同一套工具、同一套守卫规则、同一批 demo 身份。这是「守卫与 CRM 后端无关」的证据。
+// 工具名扁平命名空间，两个 CRM 不能同时注册（会撞名），因此按环境二选一。
+const crmBackend = process.env.FOUNDRY_CRM_BACKEND === 'twenty' ? 'twenty' : 'espocrm';
+const crmBinding =
+  crmBackend === 'twenty'
+    ? { adapter: createTwentyAdapter(), rbac: await loadRbac('rbac.twenty.yaml') }
+    : { adapter: createEspoCrmAdapter(), rbac: await loadRbac('rbac.espocrm.yaml') };
+
 const server = createFoundryServer({
   systems: [
     { adapter: createOrangeHrmAdapter(), rbac: await loadRbac('rbac.orangehrm.yaml') },
-    { adapter: createEspoCrmAdapter(), rbac: await loadRbac('rbac.espocrm.yaml') },
+    crmBinding,
   ],
   audit: new JsonlAuditLogger(fileURLToPath(new URL('audit/foundry.jsonl', repoRoot))),
   // 与审计同目录：复用同一个持久化卷与 rsync 排除规则。存 args 原文（续跑必需），同级对待
@@ -111,6 +121,7 @@ const server = createFoundryServer({
 const port = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3100;
 server.listen(port, () => {
   console.log(`mcp-foundry: http://localhost:${port}/mcp`);
+  console.log(`crm backend: ${crmBackend}（FOUNDRY_CRM_BACKEND 切换 espocrm/twenty）`);
   if (auth.mode === 'headers') {
     console.warn(
       'identity: DEMO trust headers x-foundry-user / x-foundry-role — unsigned, anyone can claim any role.',
