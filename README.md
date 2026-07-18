@@ -34,6 +34,9 @@ CRM 域开放写工具后补上第四道：**高危写操作人工审批（Human
 （只退自己名下订单，越权退款在审批前就 `row_denied`）。这一档对应「动钱」类高危动作
 的现代口径（EU AI Act Art.14 人工监督、中国 TC260 资金动作二次确认）。
 
+每道控制到 OWASP Agentic Top 10 / OWASP LLM Top 10 / 中国 TC260 的逐条映射、
+设计原则与**诚实的未覆盖清单**见 [THREAT_MODEL.md](THREAT_MODEL.md)。
+
 ## 架构
 
 ```
