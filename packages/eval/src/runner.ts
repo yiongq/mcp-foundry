@@ -151,6 +151,7 @@ function toPrincipal(p: EvalPrincipal): Principal {
   return {
     userId: p.userId,
     role: p.role,
+    ...(p.rolesBySystem !== undefined ? { rolesBySystem: p.rolesBySystem } : {}),
     ...(p.attrs !== undefined ? { attrs: p.attrs } : {}),
   };
 }

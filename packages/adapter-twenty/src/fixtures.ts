@@ -19,9 +19,9 @@ const CURRENCY = 'CNY';
  * 演示与评测数据（fixture 后端用，真库走 REST）。数值被评测题面引用，不要改动。身份沿用公司统一员工号命名空间。
  */
 export const FIXTURE_OWNERS: Readonly<Record<string, string>> = {
-  e005: '王五',
-  e007: '孙七',
-  e008: '周八',
+  e005: '何静',
+  e007: '林哲',
+  e008: '罗宁',
 };
 
 export const FIXTURE_ACCOUNTS: readonly AccountDetail[] = [
@@ -218,6 +218,25 @@ export const FIXTURE_ORDERS: readonly OrderRow[] = [
     amount_paid: 150000,
     currency: CURRENCY,
     owner_id: 'e008',
+  },
+  // 小额订单：让退款分级的「小额自动放行」档在数据上直观（同一 ¥600 订单退 ¥400 自动、退 ¥600 挂起）
+  {
+    order_id: 'ord-1004',
+    account_id: 'a001',
+    email: 'chenjianguo@huasheng.example.com',
+    last_four: '4321',
+    amount_paid: 600,
+    currency: CURRENCY,
+    owner_id: 'e007',
+  },
+  {
+    order_id: 'ord-1005',
+    account_id: 'a002',
+    email: 'liumin@lanchuan.example.com',
+    last_four: '8765',
+    amount_paid: 300,
+    currency: CURRENCY,
+    owner_id: 'e007',
   },
 ];
 

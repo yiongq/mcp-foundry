@@ -14,7 +14,7 @@
 
 ---
 
-自测入口：起 `docker/orangehrm` 环境后，OrangeHRM 自带 Swagger 文档页（管理后台可开），逐条核对下表即可清掉「待实测」。下表的 OAuth token 部分已被上面的结论取代。
+自测入口：对着任一 OrangeHRM 实例（官方 docker 镜像 `orangehrm/orangehrm` 即可）核对下表——OrangeHRM 自带 Swagger 文档页（管理后台可开）。下表的 OAuth token 部分已被上面的结论取代。（HR 域生产口径是 6 人 fixture，无需自建实例。）
 
 ## 认证
 

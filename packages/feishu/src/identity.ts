@@ -13,7 +13,9 @@ const identityFileSchema = z.object({
       z.string().min(1),
       z.object({
         userId: z.string().min(1),
+        // role 是缺省/兜底角色；roles 可按系统覆盖（多帽子：HR 的 hr_admin + CRM 的 sales_manager）
         role: z.string().min(1),
+        roles: z.record(z.string().min(1), z.string().min(1)).optional(),
       }),
     )
     .default({}),
@@ -28,5 +30,7 @@ export function loadIdentityMap(yamlText: string): IdentityMap {
 export function resolvePrincipal(map: IdentityMap, senderId: string): Principal | null {
   const entry = map[senderId];
   if (entry === undefined) return null;
-  return { userId: entry.userId, role: entry.role };
+  return entry.roles !== undefined
+    ? { userId: entry.userId, role: entry.role, rolesBySystem: entry.roles }
+    : { userId: entry.userId, role: entry.role };
 }

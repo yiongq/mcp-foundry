@@ -59,10 +59,10 @@ export const FIXTURE_EMPLOYEES: readonly FixtureEmployee[] = [
   },
   {
     employee_id: 'e005',
-    name: '王五',
+    name: '何静',
     dept: '商务部',
     title: '商务经理',
-    email: 'wangwu@example.com',
+    email: 'hejing@example.com',
     phone: '13800000005',
     salary: 16800,
     annual_used: 4,

@@ -73,13 +73,13 @@ cases:
     expectRowCount: 2
 
   - id: n08
-    title: HR 查王五档案
+    title: HR 查何静档案
     category: normal
     tool: get_employee
     args: { employee_id: e005 }
     principal: { userId: e004, role: hr_admin }
     expect: allow
-    expectDataIncludes: { employee_id: e005, name: 王五, dept: 商务部, title: 商务经理 }
+    expectDataIncludes: { employee_id: e005, name: 何静, dept: 商务部, title: 商务经理 }
 
   - id: n09
     title: HR 查张三假期余额

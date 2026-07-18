@@ -27,6 +27,8 @@ import type { IdentityJwks } from './jwks.js';
 export interface IdentityClaims {
   sub: string;
   role: string;
+  /** 可选：按系统覆盖角色（多帽子）。签发方背书，与签名一同被验。缺省回落到 role。 */
+  roles?: Record<string, string>;
   iat: number;
   exp: number;
 }
@@ -55,9 +57,20 @@ function buildClaims(principal: Principal, ttlSeconds: number, issuedAt: number)
   return {
     sub: principal.userId,
     role: principal.role,
+    ...(principal.rolesBySystem !== undefined ? { roles: principal.rolesBySystem } : {}),
     iat: issuedAt,
     exp: issuedAt + ttlSeconds,
   };
+}
+
+/** roles claim 合法性：对象且每个值都是非空字符串，否则忽略（回落到 role）。 */
+function validRolesClaim(roles: unknown): roles is Record<string, string> {
+  return (
+    typeof roles === 'object' &&
+    roles !== null &&
+    !Array.isArray(roles) &&
+    Object.values(roles).every((v) => typeof v === 'string' && v !== '')
+  );
 }
 
 /** 签名通过之后才解析 payload；三段式/空段在调用方已挡掉。 */
@@ -81,7 +94,14 @@ function parseVerifiedClaims(payload: string, now: number): TokenVerdict {
   }
   if ((claims.exp as number) <= now) return { ok: false, reason: 'expired' };
 
-  return { ok: true, principal: { userId: claims.sub, role: claims.role } };
+  return {
+    ok: true,
+    principal: {
+      userId: claims.sub,
+      role: claims.role,
+      ...(validRolesClaim(claims.roles) ? { rolesBySystem: claims.roles } : {}),
+    },
+  };
 }
 
 function splitToken(token: string): [string, string, string] | null {

@@ -6,6 +6,7 @@ import {
   resolveSelfRef,
   roleHasApprovalRule,
   roleRequiresApproval,
+  withSystemRole,
 } from './rbac.js';
 import type { GuardedResult, Principal, SystemAdapter, ToolCall, ToolSpec } from './types.js';
 
@@ -47,7 +48,9 @@ export class Guard {
   }
 
   /** tools/list 阶段就按角色收窄——不该用的工具连列表里都不出现 */
-  allowedTools(adapter: SystemAdapter, principal: Principal): ToolSpec[] {
+  allowedTools(adapter: SystemAdapter, rawPrincipal: Principal): ToolSpec[] {
+    // 按目标系统解析角色（多帽子：同一人在不同系统可有不同角色）
+    const principal = withSystemRole(rawPrincipal, adapter.system);
     if (this.disabled.has('rbac')) return adapter.tools();
     const role = this.rbac.roles[principal.role];
     if (!role) return [];
@@ -58,9 +61,11 @@ export class Guard {
 
   async invoke(
     adapter: SystemAdapter,
-    principal: Principal,
+    rawPrincipal: Principal,
     call: ToolCall,
   ): Promise<GuardedResult> {
+    // 按目标系统解析角色（多帽子：同一人在不同系统可有不同角色）；下游统一用 principal
+    const principal = withSystemRole(rawPrincipal, adapter.system);
     const startedAt = performance.now();
     const done = async (result: GuardedResult): Promise<GuardedResult> => {
       await this.audit.log({

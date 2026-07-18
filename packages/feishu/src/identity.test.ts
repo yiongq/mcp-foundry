@@ -12,6 +12,21 @@ identities:
     expect(resolvePrincipal(map, 'ou_def')).toEqual({ userId: 'e004', role: 'hr_admin' });
   });
 
+  it('多帽子绑定：roles 按系统覆盖 → rolesBySystem（role 作缺省）', () => {
+    const map = loadIdentityMap(`
+identities:
+  ou_multi:
+    userId: e004
+    role: hr_admin
+    roles: { twenty: sales_manager }
+`);
+    expect(resolvePrincipal(map, 'ou_multi')).toEqual({
+      userId: 'e004',
+      role: 'hr_admin',
+      rolesBySystem: { twenty: 'sales_manager' },
+    });
+  });
+
   it('未绑定的 open_id 返回 null——没有任何默认身份兜底', () => {
     const map = loadIdentityMap('identities: {}');
     expect(resolvePrincipal(map, 'ou_ghost')).toBeNull();

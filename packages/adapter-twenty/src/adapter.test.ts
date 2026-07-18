@@ -49,7 +49,7 @@ describe('twenty fixture：七读五写', () => {
     expect(data).toEqual([
       {
         owner_id: 'e007',
-        owner_name: '孙七',
+        owner_name: '林哲',
         open_count: 3,
         open_amount: 1465000,
         won_count: 0,
@@ -57,7 +57,7 @@ describe('twenty fixture：七读五写', () => {
       },
       {
         owner_id: 'e008',
-        owner_name: '周八',
+        owner_name: '罗宁',
         open_count: 1,
         open_amount: 98000,
         won_count: 1,
@@ -118,7 +118,7 @@ describe('rbac.twenty.yaml 与守卫联动（守卫与后端无关）', () => {
     return new Guard(loadRbacConfig(yamlText), new MemoryAuditLogger(), { approvals: store });
   }
 
-  it('孙七拉客户：只见自己的 3 家', async () => {
+  it('林哲拉客户：只见自己的 3 家', async () => {
     const guard = await loadGuard();
     const r = await guard.invoke(adapter, SUN_QI, { tool: 'list_accounts', args: {} });
     expect(r.kind).toBe('ok');
@@ -131,7 +131,7 @@ describe('rbac.twenty.yaml 与守卫联动（守卫与后端无关）', () => {
     }
   });
 
-  it('孙七查自己客户的联系人：放行但 phone 脱敏', async () => {
+  it('林哲查自己客户的联系人：放行但 phone 脱敏', async () => {
     const guard = await loadGuard();
     const r = await guard.invoke(adapter, SUN_QI, {
       tool: 'get_contact',
@@ -144,14 +144,14 @@ describe('rbac.twenty.yaml 与守卫联动（守卫与后端无关）', () => {
     }
   });
 
-  it('孙七清点全员业绩盘：工具白名单拒绝', async () => {
+  it('林哲清点全员业绩盘：工具白名单拒绝', async () => {
     const guard = await loadGuard();
     const r = await guard.invoke(adapter, SUN_QI, { tool: 'get_pipeline_summary', args: {} });
     expect(r.kind).toBe('refusal');
     if (r.kind === 'refusal') expect(r.reason).toBe('tool_not_allowed');
   });
 
-  it('审批闸门：孙七删自己的 c001 → pending；批准后重试执行且 phone 脱敏', async () => {
+  it('审批闸门：林哲删自己的 c001 → pending；批准后重试执行且 phone 脱敏', async () => {
     const a = createTwentyAdapter({ env: {} });
     const store = new MemoryApprovalStore();
     const guard = await loadGuard(store);
@@ -168,7 +168,7 @@ describe('rbac.twenty.yaml 与守卫联动（守卫与后端无关）', () => {
     }
   });
 
-  it('写前归属校验：孙七删同事(e008)的 c003 → execute 前 row_denied，未删', async () => {
+  it('写前归属校验：林哲删同事(e008)的 c003 → execute 前 row_denied，未删', async () => {
     const a = createTwentyAdapter({ env: {} });
     const guard = await loadGuard();
     const r = await guard.invoke(a, SUN_QI, {
@@ -229,7 +229,7 @@ describe('rbac.twenty.yaml 与守卫联动（守卫与后端无关）', () => {
     ).toMatchObject({ order_id: 'ord-2001', owner_id: 'e008' });
   });
 
-  it('守卫分级：孙七小额退款自动放行、大额挂起', async () => {
+  it('守卫分级：林哲小额退款自动放行、大额挂起', async () => {
     const a = createTwentyAdapter({ env: {} });
     const guard = await loadGuard();
     const small = await guard.invoke(a, SUN_QI, {
@@ -244,7 +244,7 @@ describe('rbac.twenty.yaml 与守卫联动（守卫与后端无关）', () => {
     expect(big.kind).toBe('pending');
   });
 
-  it('守卫：孙七退同事名下订单 ord-2001 → 审批/核验前就 row_denied', async () => {
+  it('守卫：林哲退同事名下订单 ord-2001 → 审批/核验前就 row_denied', async () => {
     const a = createTwentyAdapter({ env: {} });
     const guard = await loadGuard();
     const r = await guard.invoke(a, SUN_QI, {
