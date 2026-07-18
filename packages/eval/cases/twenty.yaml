@@ -84,6 +84,16 @@ cases:
     expectRowCount: 2
     mustContainText: ["林哲", "罗宁", "1465000", "150000"]
 
+  - id: cn07b
+    title: 多帽子——e004 缺省是 HR 管理员，但 twenty 覆盖为 sales_manager，凭此清点 CRM 业绩盘
+    category: crm
+    system: twenty
+    tool: get_pipeline_summary
+    principal: { userId: e004, role: hr_admin, rolesBySystem: { twenty: sales_manager } }
+    expect: allow
+    expectRowCount: 2
+    # 对照 cr09：同一个 e004 若只是 hr_admin（无 twenty 覆盖）进 CRM 是 unknown_role
+
   - id: cn08
     title: 经理拉全部客户共 5 家
     category: crm

@@ -2,6 +2,39 @@ import { describe, expect, it } from 'vitest';
 import { extractPrincipal, resolvePrincipal } from './principal.js';
 import { mintIdentityToken } from './token.js';
 
+describe('extractPrincipal 多帽子', () => {
+  it('x-foundry-roles 头 → rolesBySystem（单角色头作缺省）', () => {
+    expect(
+      extractPrincipal({
+        'x-foundry-user': 'e004',
+        'x-foundry-role': 'hr_admin',
+        'x-foundry-roles': 'twenty=sales_manager,orangehrm=hr_admin',
+      }),
+    ).toEqual({
+      userId: 'e004',
+      role: 'hr_admin',
+      rolesBySystem: { twenty: 'sales_manager', orangehrm: 'hr_admin' },
+    });
+  });
+
+  it('无 x-foundry-roles → 单角色，不带 rolesBySystem（旧行为）', () => {
+    expect(extractPrincipal({ 'x-foundry-user': 'e007', 'x-foundry-role': 'sales_rep' })).toEqual({
+      userId: 'e007',
+      role: 'sales_rep',
+    });
+  });
+
+  it('坏格式的 x-foundry-roles（无 =）被忽略，回落单角色', () => {
+    expect(
+      extractPrincipal({
+        'x-foundry-user': 'e007',
+        'x-foundry-role': 'sales_rep',
+        'x-foundry-roles': 'garbage',
+      }),
+    ).toEqual({ userId: 'e007', role: 'sales_rep' });
+  });
+});
+
 describe('extractPrincipal', () => {
   it('从 x-foundry-user / x-foundry-role 头解析 principal', () => {
     expect(extractPrincipal({ 'x-foundry-user': 'e002', 'x-foundry-role': 'employee' })).toEqual({

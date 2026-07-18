@@ -16,6 +16,19 @@ describe('mintIdentityToken / verifyIdentityToken', () => {
     });
   });
 
+  it('多帽子：roles claim 随签名背书，验签后恢复 rolesBySystem', () => {
+    const token = mintIdentityToken(
+      SECRET,
+      { userId: 'e004', role: 'hr_admin', rolesBySystem: { twenty: 'sales_manager' } },
+      3600,
+      NOW,
+    );
+    expect(verifyIdentityToken(SECRET, token, NOW + 10)).toEqual({
+      ok: true,
+      principal: { userId: 'e004', role: 'hr_admin', rolesBySystem: { twenty: 'sales_manager' } },
+    });
+  });
+
   it('过期令牌拒绝，exp 恰好等于 now 也算过期', () => {
     const token = mintIdentityToken(SECRET, { userId: 'e002', role: 'employee' }, 60, NOW);
     expect(verifyIdentityToken(SECRET, token, NOW + 61)).toEqual({

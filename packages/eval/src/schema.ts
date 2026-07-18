@@ -5,6 +5,8 @@ import { z } from 'zod';
 const principalSchema = z.object({
   userId: z.string().min(1),
   role: z.string().min(1),
+  /** 按系统覆盖角色（多帽子）：{ twenty: sales_manager }。缺省回落到 role。 */
+  rolesBySystem: z.record(z.string().min(1), z.string().min(1)).optional(),
   attrs: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
 });
 

@@ -1,9 +1,18 @@
 import type { z } from 'zod';
 
-/** 提问人身份。userId 由入口层（飞书事件 / demo header）提供，Foundry 内部不做认证。 */
+/**
+ * 提问人身份。userId 由入口层（飞书事件 / demo header）提供，Foundry 内部不做认证。
+ *
+ * 角色是**按系统**解析的：一个人可以在不同系统里有不同角色（HR 的 hr_admin +
+ * CRM 的 sales_manager）。`rolesBySystem` 是按系统的覆盖，`role` 是缺省/兜底——
+ * 守卫针对目标系统取 `rolesBySystem[system] ?? role`（见 roleForSystem）。
+ * 只填 `role`（不填 rolesBySystem）= 单角色全局，与旧行为完全一致。
+ */
 export interface Principal {
   userId: string;
   role: string;
+  /** 按系统覆盖角色，如 { orangehrm: 'hr_admin', twenty: 'sales_manager' }。缺省回落到 role。 */
+  rolesBySystem?: Record<string, string>;
   attrs?: Record<string, string | number>;
 }
 

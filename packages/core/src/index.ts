@@ -16,8 +16,10 @@ export {
   evalApprovalCondition,
   loadRbacConfig,
   resolveSelfRef,
+  roleForSystem,
   roleHasApprovalRule,
   roleRequiresApproval,
+  withSystemRole,
 } from './rbac.js';
 export type {
   AdapterResult,

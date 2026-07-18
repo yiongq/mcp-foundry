@@ -3,6 +3,21 @@ import { z } from 'zod';
 import type { Principal } from './types.js';
 
 /**
+ * 按目标系统解析角色：一个人可在不同系统里有不同角色（HR 的 hr_admin + CRM 的
+ * sales_manager）。`rolesBySystem[system]` 优先，缺省回落到 `role`——只填 role
+ * （单角色全局）与旧行为完全一致。
+ */
+export function roleForSystem(principal: Principal, system: string): string {
+  return principal.rolesBySystem?.[system] ?? principal.role;
+}
+
+/** 返回一个「role 已按目标系统解析好」的 principal，供守卫下游统一使用（无覆盖则原样返回）。 */
+export function withSystemRole(principal: Principal, system: string): Principal {
+  const role = roleForSystem(principal, system);
+  return role === principal.role ? principal : { ...principal, role };
+}
+
+/**
  * 行级规则：结果集中每一行的 field 必须等于 equals 解出的值。
  * equals 支持 "$self.userId" / "$self.attrs.<key>" 引用提问人，或字面量。
  * 刻意不做表达式 DSL——可求值字符串是注入面，结构化对象不是。

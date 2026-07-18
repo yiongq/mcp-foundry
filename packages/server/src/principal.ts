@@ -17,6 +17,8 @@ import { verifyIdentityToken, verifyIdentityTokenJwks } from './token.js';
 
 export const USER_HEADER = 'x-foundry-user';
 export const ROLE_HEADER = 'x-foundry-role';
+/** 可选：按系统覆盖角色（多帽子），格式 `orangehrm=hr_admin,twenty=sales_manager`。缺省回落到 x-foundry-role。 */
+export const ROLES_HEADER = 'x-foundry-roles';
 
 export type AuthConfig =
   | { mode: 'headers' }
@@ -31,12 +33,27 @@ function headerValue(headers: IncomingHttpHeaders, name: string): string | null 
   return value !== undefined && value !== '' ? value : null;
 }
 
+/** `orangehrm=hr_admin,twenty=sales_manager` → { orangehrm: 'hr_admin', twenty: 'sales_manager' }。空/坏格式返回 undefined。 */
+function parseRolesHeader(value: string | null): Record<string, string> | undefined {
+  if (value === null) return undefined;
+  const out: Record<string, string> = {};
+  for (const pair of value.split(',')) {
+    const eq = pair.indexOf('=');
+    if (eq <= 0) continue;
+    const system = pair.slice(0, eq).trim();
+    const role = pair.slice(eq + 1).trim();
+    if (system !== '' && role !== '') out[system] = role;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** 两个头缺一不可、空值视同缺失——宁可 401，不给 Guard 喂半截身份。 */
 export function extractPrincipal(headers: IncomingHttpHeaders): Principal | null {
   const userId = headerValue(headers, USER_HEADER);
   const role = headerValue(headers, ROLE_HEADER);
   if (userId === null || role === null) return null;
-  return { userId, role };
+  const rolesBySystem = parseRolesHeader(headerValue(headers, ROLES_HEADER));
+  return rolesBySystem !== undefined ? { userId, role, rolesBySystem } : { userId, role };
 }
 
 function extractBearerToken(headers: IncomingHttpHeaders): string | null {
