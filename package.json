@@ -10,7 +10,10 @@
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
     "lint": "biome check .",
-    "lint:fix": "biome check --write ."
+    "lint:fix": "biome check --write .",
+    "twenty:up": "docker compose -f docker-compose.twenty.yml up -d",
+    "twenty:down": "docker compose -f docker-compose.twenty.yml down",
+    "seed:twenty": "node --import tsx packages/adapter-twenty/bin/seed-twenty.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",

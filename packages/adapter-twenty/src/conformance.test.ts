@@ -43,7 +43,10 @@ function mockTwentyFetch(opts: MockOpts = {}): typeof fetch {
       if (opts.paginateOrders) {
         return url.includes('starting_after')
           ? json({ data: { orders: ORDER_ROWS.slice(1) }, pageInfo: { hasNextPage: false } })
-          : json({ data: { orders: ORDER_ROWS.slice(0, 1) }, pageInfo: { hasNextPage: true, endCursor: 'cur-1' } });
+          : json({
+              data: { orders: ORDER_ROWS.slice(0, 1) },
+              pageInfo: { hasNextPage: true, endCursor: 'cur-1' },
+            });
       }
       return json({ data: { orders: ORDER_ROWS } });
     }
@@ -106,7 +109,12 @@ function refundContract(label: string, makeBackend: () => TwentyBackend): void {
 
     it('issueRefund 订单不存在 → 抛错（不静默成功）', async () => {
       await expect(
-        makeBackend().issueRefund({ order_id: 'ord-nope', email: 'x@y.z', last_four: '0000', amount: 1 }),
+        makeBackend().issueRefund({
+          order_id: 'ord-nope',
+          email: 'x@y.z',
+          last_four: '0000',
+          amount: 1,
+        }),
       ).rejects.toThrow();
     });
   });
@@ -119,7 +127,9 @@ refundContract('twenty 真库 REST 后端', () => restBackend());
 describe('REST 后端漂移护栏（fixture 掩盖不了这些）', () => {
   it('分页：落在第 2 页的订单也能被 getOrder 找到（不只读首页）', async () => {
     // ord-1002 在次页——只读首页会漏 → 曾导致 refundCountThisMonth 少算、绕过频次闸门
-    expect((await restBackend({ paginateOrders: true }).getOrder('ord-1002'))?.order_id).toBe('ord-1002');
+    expect((await restBackend({ paginateOrders: true }).getOrder('ord-1002'))?.order_id).toBe(
+      'ord-1002',
+    );
   });
 
   it('POST /refunds 返 404 → 抛错（fail-closed，绝不把没落库的退款报成 issued）', async () => {
