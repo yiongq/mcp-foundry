@@ -14,7 +14,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createEspoCrmAdapter } from '@yiong/foundry-adapter-espocrm';
 import { createOrangeHrmAdapter } from '@yiong/foundry-adapter-orangehrm';
-import { JsonlAuditLogger, loadRbacConfig } from '@yiong/foundry-core';
+import { JsonlApprovalStore, JsonlAuditLogger, loadRbacConfig } from '@yiong/foundry-core';
 import {
   type AuthConfig,
   createFoundryServer,
@@ -103,6 +103,8 @@ const server = createFoundryServer({
     { adapter: createEspoCrmAdapter(), rbac: await loadRbac('rbac.espocrm.yaml') },
   ],
   audit: new JsonlAuditLogger(fileURLToPath(new URL('audit/foundry.jsonl', repoRoot))),
+  // 与审计同目录：复用同一个持久化卷与 rsync 排除规则。存 args 原文（续跑必需），同级对待
+  approvals: new JsonlApprovalStore(fileURLToPath(new URL('audit/approvals.jsonl', repoRoot))),
   auth,
 });
 

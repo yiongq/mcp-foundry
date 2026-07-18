@@ -117,7 +117,7 @@
         <div style="text-align:center;color:var(--accent);padding:8px 0">▼</div>
         <div style="border:1px solid var(--accent-soft-border);border-radius:var(--r-md);padding:18px;background:var(--accent-soft)">
           <div style="color:var(--accent-text);margin-bottom:8px">Guard 管线 · packages/core</div>
-          <div style="color:var(--fg-muted);font-size:12px;line-height:1.8">角色查找 → 工具白名单 → 行级过滤 → 字段脱敏 → 审计 JSONL</div>
+          <div style="color:var(--fg-muted);font-size:12px;line-height:1.8">角色查找 → 工具白名单 → 审批闸门（写前挂起） → 行级过滤 → 字段脱敏 → 审计 JSONL</div>
         </div>
         <div style="text-align:center;color:var(--accent);padding:8px 0">▼</div>
         <div class="grid-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
@@ -210,12 +210,12 @@ pnpm --filter @yiong/foundry-server serve
     <div style="margin-bottom:40px">
       <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">评测</div>
       <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">守卫的价值是分数差,不是一句「我们有 RBAC」</h2>
-      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">82 题越权/泄漏题库跨三个域,硬断言 + LLM-judge 双轨(judge 须先过人工校准,只能加严不能翻案),所有实测数据可本机复现。</p>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">86 题越权/泄漏题库跨三个域,硬断言 + LLM-judge 双轨(judge 须先过人工校准,只能加严不能翻案),所有实测数据可本机复现。</p>
     </div>
     <div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:44px">
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
-        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">82</div>
-        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">题 × 9 类,跨三个域<br>HR 29 · 记忆 20 · CRM 33</div>
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">86</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">题 × 10 类,跨三个域<br>HR 29 · 记忆 20 · CRM 37</div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
         <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">100%</div>
@@ -274,7 +274,7 @@ pnpm --filter @yiong/foundry-server serve
       <p style="color:var(--fg-muted);margin:12px 0 0;max-width:640px">安全产品最怕过度承诺。以下边界与 README 保持同步:</p>
     </div>
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px 32px;font-size:13.5px;line-height:1.8;color:var(--fg-muted)">
-      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>双真库(OrangeHRM 5.7 / EspoCRM 9.3,只读 MySQL)82 题全绿——指本地 docker、演示数据口径,<b style="color:var(--fg-strong)">不是生产环境</b></span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>双真库(OrangeHRM 5.7 / EspoCRM 9.3,只读 MySQL)读路径全绿——指本地 docker、演示数据口径,<b style="color:var(--fg-strong)">不是生产环境</b>(审批写路径的真库复验待做)</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>线上跑 fixture 后端(演示数据),不连真实 HR/CRM 系统</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>体验链接的身份是<b style="color:var(--fg-strong)">配好的</b>,不是登录来的——演示「同一网关、不同身份、行为不同」,不是登录系统</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>行级/字段规则只在 Guard 出口生效;绕过 Foundry 直连源系统管不到——源系统凭据只发给 Foundry</span></div>
@@ -530,12 +530,12 @@ pnpm --filter @yiong/foundry-server serve
     <div style="margin-bottom:40px">
       <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:14px">evals</div>
       <h2 style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--fg-strong)">A guard's value is a score gap, not "we have RBAC"</h2>
-      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">82 leak/privilege cases across three domains; hard assertions + LLM-judge dual track (judge must pass human calibration, and can only add failures). All numbers reproducible locally.</p>
+      <p style="color:var(--fg-muted);margin:12px 0 0;max-width:680px">86 leak/privilege cases across three domains; hard assertions + LLM-judge dual track (judge must pass human calibration, and can only add failures). All numbers reproducible locally.</p>
     </div>
     <div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:44px">
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
-        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">82</div>
-        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">cases × 9 categories, 3 domains<br>HR 29 · memory 20 · CRM 33</div>
+        <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">86</div>
+        <div style="font-size:12.5px;color:var(--fg-muted);margin-top:6px;line-height:1.6">cases × 10 categories, 3 domains<br>HR 29 · memory 20 · CRM 37</div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-panel);padding:22px">
         <div style="font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--accent-text)">100%</div>
@@ -594,7 +594,7 @@ pnpm --filter @yiong/foundry-server serve
       <p style="color:var(--fg-muted);margin:12px 0 0;max-width:640px">Overpromising is the worst failure mode for a security product. These limits stay in sync with the README:</p>
     </div>
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px 32px;font-size:13.5px;line-height:1.8;color:var(--fg-muted)">
-      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>82 cases green against both real DBs (OrangeHRM 5.7 / EspoCRM 9.3, read-only MySQL) — local docker, demo-scale data, <b style="color:var(--fg-strong)">not production</b></span></div>
+      <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>read paths green against both real DBs (OrangeHRM 5.7 / EspoCRM 9.3, read-only MySQL) — local docker, demo-scale data, <b style="color:var(--fg-strong)">not production</b> (approval write path not yet re-verified against real DB)</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>The live instance runs the fixture backend (demo data), not a real HR/CRM system</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>Demo identities are <b style="color:var(--fg-strong)">pre-configured</b>, not logged in — it demonstrates "same gateway, different identity, different behavior", not a login system</span></div>
       <div style="display:flex;gap:10px"><span style="color:var(--success)">✓</span><span>Row/field rules apply only at the guard's exit; bypassing Foundry to hit the source system directly is out of scope — source credentials go to Foundry only</span></div>

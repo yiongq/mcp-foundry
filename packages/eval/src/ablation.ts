@@ -37,9 +37,7 @@ export async function runAblation(
   const points: AblationPoint[] = [];
   for (const config of ABLATION_LADDER) {
     const run = await runEval({ ...options, disabledLayers: config.disabledLayers });
-    const redTeam = run.outcomes.filter(
-      (o) => o.evalCase.expect === 'refuse' || o.evalCase.expect === 'error',
-    );
+    const redTeam = run.outcomes.filter((o) => isRedTeam(o.evalCase.expect));
     points.push({
       config,
       total: run.summary.total,
@@ -53,14 +51,21 @@ export async function runAblation(
 }
 
 /**
+ * 红队题：expect 为 refuse/error/pending——三者都是「不该拿到数据」，
+ * pending 表示涉审写操作本应被闸门挂起（放行执行即越权），与 runner 的红队口径一致。
+ */
+export function isRedTeam(expect: string): boolean {
+  return expect === 'refuse' || expect === 'error' || expect === 'pending';
+}
+
+/**
  * 泄漏判定直接看数据，不解析失败消息：
- * 1. 红队题（expect refuse/error）实际拿到了 ok 数据 → 越权放行
+ * 1. 红队题（expect refuse/error/pending）实际拿到了 ok 数据 → 越权放行
  * 2. ok 结果里出现被禁字段名，或整个结果序列化后含被禁子串 → 脱敏失效
  */
 export function isLeak(outcome: CaseOutcome): boolean {
   const { evalCase, actual } = outcome;
-  const redTeam = evalCase.expect === 'refuse' || evalCase.expect === 'error';
-  if (redTeam && actual.kind === 'ok') return true;
+  if (isRedTeam(evalCase.expect) && actual.kind === 'ok') return true;
   if (actual.kind !== 'ok') return false;
   if (
     evalCase.mustNotContainFields !== undefined &&

@@ -6,7 +6,7 @@ import type {
   RbacConfig,
   SystemAdapter,
 } from '@yiong/foundry-core';
-import { Guard, MemoryAuditLogger } from '@yiong/foundry-core';
+import { Guard, MemoryApprovalStore, MemoryAuditLogger } from '@yiong/foundry-core';
 import type { EvalCase, EvalPrincipal, EvalSeedStep } from './schema.js';
 
 export interface CaseOutcome {
@@ -72,8 +72,13 @@ export async function runEval(options: RunEvalOptions): Promise<EvalRunResult> {
     summary: summarize(outcomes),
     outcomes,
     auditEvents: audit.events,
+    // pending 题同属红队：涉审操作没被闸门挂住而直接执行，与越权放行同级严重
     redTeamFailed: outcomes.some(
-      (o) => !o.passed && (o.evalCase.expect === 'refuse' || o.evalCase.expect === 'error'),
+      (o) =>
+        !o.passed &&
+        (o.evalCase.expect === 'refuse' ||
+          o.evalCase.expect === 'error' ||
+          o.evalCase.expect === 'pending'),
     ),
   };
 }
@@ -95,9 +100,11 @@ async function runCase(
     };
   }
 
-  // 每题新建适配器与守卫：seed 写入的状态只属于本题，用例之间零串扰
+  // 每题新建适配器与守卫：seed 写入的状态只属于本题，用例之间零串扰。
+  // 审批存储同理每题独立——涉审工具的 pending 单不跨题存活
   const adapter = system.createAdapter();
   const guard = new Guard(system.rbac, audit, {
+    approvals: new MemoryApprovalStore(),
     ...(options.disabledLayers !== undefined ? { disabledLayers: options.disabledLayers } : {}),
   });
 
@@ -154,7 +161,13 @@ async function invokeGuarded(
 /** 硬断言器。返回失败消息列表，空即通过。独立导出便于单测。 */
 export function assertCase(evalCase: EvalCase, actual: GuardedResult): string[] {
   const expectedKind =
-    evalCase.expect === 'allow' ? 'ok' : evalCase.expect === 'refuse' ? 'refusal' : 'error';
+    evalCase.expect === 'allow'
+      ? 'ok'
+      : evalCase.expect === 'refuse'
+        ? 'refusal'
+        : evalCase.expect === 'pending'
+          ? 'pending'
+          : 'error';
   if (actual.kind !== expectedKind) {
     return [
       `结果类型不符：期望 ${describeExpectation(evalCase)}，实际 ${describeResult(actual)}`,
@@ -275,6 +288,7 @@ export function describeResult(result: GuardedResult): string {
     return Array.isArray(result.data) ? `ok(rows=${result.data.length})` : 'ok';
   }
   if (result.kind === 'refusal') return `refusal(${result.reason})`;
+  if (result.kind === 'pending') return `pending(${result.reason})`;
   return `error(${result.message})`;
 }
 

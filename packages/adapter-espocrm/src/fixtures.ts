@@ -3,9 +3,11 @@ import type {
   AccountRow,
   ContactListRow,
   ContactRow,
+  CreateContactInput,
   EspoCrmBackend,
   OpportunityRow,
   PipelineSummaryRow,
+  UpdateContactPatch,
 } from './backend.js';
 
 const CURRENCY = 'CNY';
@@ -176,12 +178,20 @@ export const FIXTURE_OPPORTUNITIES: readonly OpportunityRow[] = [
   },
 ];
 
+/**
+ * 写工具落地后 fixture 改为实例态：构造时深拷贝模块级常量，写入只动自己那份。
+ * 模块级 FIXTURE_* 数值被评测题面引用，永远不被任何实例修改；
+ * 每个测试/评测用例各建各的 FixtureBackend，写入互不串扰。
+ */
 export class FixtureBackend implements EspoCrmBackend {
+  private readonly accounts: AccountDetail[] = FIXTURE_ACCOUNTS.map((a) => ({ ...a }));
+  private readonly contacts: ContactRow[] = FIXTURE_CONTACTS.map((c) => ({ ...c }));
+  private readonly opportunities: OpportunityRow[] = FIXTURE_OPPORTUNITIES.map((o) => ({ ...o }));
+  private nextContactSeq = 100;
+
   async listAccounts(industry?: string): Promise<AccountRow[]> {
     const rows =
-      industry === undefined
-        ? FIXTURE_ACCOUNTS
-        : FIXTURE_ACCOUNTS.filter((a) => a.industry === industry);
+      industry === undefined ? this.accounts : this.accounts.filter((a) => a.industry === industry);
     return rows.map((a) => ({
       account_id: a.account_id,
       name: a.name,
@@ -191,14 +201,14 @@ export class FixtureBackend implements EspoCrmBackend {
   }
 
   async getAccount(accountId: string): Promise<AccountDetail | null> {
-    return FIXTURE_ACCOUNTS.find((a) => a.account_id === accountId) ?? null;
+    return this.accounts.find((a) => a.account_id === accountId) ?? null;
   }
 
   async listContacts(accountId?: string): Promise<ContactListRow[]> {
     const rows =
       accountId === undefined
-        ? FIXTURE_CONTACTS
-        : FIXTURE_CONTACTS.filter((c) => c.account_id === accountId);
+        ? this.contacts
+        : this.contacts.filter((c) => c.account_id === accountId);
     return rows.map((c) => ({
       contact_id: c.contact_id,
       name: c.name,
@@ -209,23 +219,64 @@ export class FixtureBackend implements EspoCrmBackend {
   }
 
   async getContact(contactId: string): Promise<ContactRow | null> {
-    return FIXTURE_CONTACTS.find((c) => c.contact_id === contactId) ?? null;
+    return this.contacts.find((c) => c.contact_id === contactId) ?? null;
   }
 
   async listOpportunities(stage?: string): Promise<OpportunityRow[]> {
     return stage === undefined
-      ? [...FIXTURE_OPPORTUNITIES]
-      : FIXTURE_OPPORTUNITIES.filter((o) => o.stage === stage);
+      ? [...this.opportunities]
+      : this.opportunities.filter((o) => o.stage === stage);
   }
 
   async getOpportunity(opportunityId: string): Promise<OpportunityRow | null> {
-    return FIXTURE_OPPORTUNITIES.find((o) => o.opportunity_id === opportunityId) ?? null;
+    return this.opportunities.find((o) => o.opportunity_id === opportunityId) ?? null;
+  }
+
+  async createContact(input: CreateContactInput): Promise<ContactRow> {
+    const row: ContactRow = {
+      contact_id: `c${this.nextContactSeq++}`,
+      name: input.name,
+      title: input.title ?? '',
+      account_id: input.account_id ?? '',
+      owner_id: input.owner_id,
+      email: input.email ?? '',
+      phone: input.phone ?? '',
+    };
+    this.contacts.push(row);
+    return row;
+  }
+
+  async updateContact(contactId: string, patch: UpdateContactPatch): Promise<ContactRow | null> {
+    const row = this.contacts.find((c) => c.contact_id === contactId);
+    if (!row) return null;
+    if (patch.name !== undefined) row.name = patch.name;
+    if (patch.title !== undefined) row.title = patch.title;
+    if (patch.email !== undefined) row.email = patch.email;
+    if (patch.phone !== undefined) row.phone = patch.phone;
+    return row;
+  }
+
+  async deleteContact(contactId: string): Promise<ContactRow | null> {
+    const index = this.contacts.findIndex((c) => c.contact_id === contactId);
+    if (index === -1) return null;
+    const [removed] = this.contacts.splice(index, 1);
+    return removed ?? null;
+  }
+
+  async updateOpportunityStage(
+    opportunityId: string,
+    stage: string,
+  ): Promise<OpportunityRow | null> {
+    const row = this.opportunities.find((o) => o.opportunity_id === opportunityId);
+    if (!row) return null;
+    row.stage = stage;
+    return row;
   }
 
   /** 从 opportunities 现算而非另存一份——汇总与明细不可能失同步 */
   async getPipelineSummary(): Promise<PipelineSummaryRow[]> {
     const byOwner = new Map<string, PipelineSummaryRow>();
-    for (const o of FIXTURE_OPPORTUNITIES) {
+    for (const o of this.opportunities) {
       const row = byOwner.get(o.owner_id) ?? {
         owner_id: o.owner_id,
         owner_name: FIXTURE_OWNERS[o.owner_id] ?? o.owner_id,

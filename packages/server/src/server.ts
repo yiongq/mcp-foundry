@@ -9,7 +9,13 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { AuditLogger, Principal, RbacConfig, SystemAdapter } from '@yiong/foundry-core';
+import type {
+  ApprovalStore,
+  AuditLogger,
+  Principal,
+  RbacConfig,
+  SystemAdapter,
+} from '@yiong/foundry-core';
 import { Guard } from '@yiong/foundry-core';
 import { type AuthConfig, resolvePrincipal } from './principal.js';
 import {
@@ -34,6 +40,13 @@ export interface FoundryServerOptions {
   audit: AuditLogger;
   /** 鉴权模式；缺省 headers（demo 信任层），生产传 { mode: 'token', secret } */
   auth?: AuthConfig;
+  /**
+   * 审批闸门的单据存储。不传则闸门不可用——角色配置了 approval 列表时，
+   * 涉审调用会得到 error（fail-closed），所以生产必须与 rbac 配置成对出现。
+   * 同时启用 GET /approvals 与 POST /approvals/{id} 两个决策端点
+   * （鉴权同 /mcp，且要求 principal 的角色在单据所属域标了 approver: true）。
+   */
+  approvals?: ApprovalStore;
   /** MCP serverInfo；默认 mcp-foundry / 0.0.1 */
   name?: string;
   version?: string;
@@ -84,12 +97,46 @@ export async function interceptDeniedToolCall(
   };
 }
 
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { 'content-type': 'application/json' });
+  res.end(JSON.stringify(body));
+}
+
+/** 审批单的对外投影：审批人必须看清在批什么，args 原文属于必要信息，不做二次省略 */
+function approvalView(record: {
+  id: string;
+  system: string;
+  tool: string;
+  args: Record<string, unknown>;
+  userId: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  expiresAt: string;
+  decidedAt?: string;
+  approverId?: string;
+}): Record<string, unknown> {
+  const { id, system, tool, args, userId, role, status, createdAt, expiresAt } = record;
+  return {
+    id,
+    system,
+    tool,
+    args,
+    requester: { userId, role },
+    status,
+    createdAt,
+    expiresAt,
+    ...(record.decidedAt !== undefined ? { decidedAt: record.decidedAt } : {}),
+    ...(record.approverId !== undefined ? { approverId: record.approverId } : {}),
+  };
+}
+
 export function createFoundryServer(options: FoundryServerOptions): Server {
   assertUniqueToolNames(options.systems.map((s) => s.adapter));
   const auth = options.auth ?? { mode: 'headers' as const };
   const systems: readonly GuardedSystem[] = options.systems.map(({ adapter, rbac }) => ({
     adapter,
-    guard: new Guard(rbac, options.audit),
+    guard: new Guard(rbac, options.audit, { approvals: options.approvals }),
   }));
   const serverInfo = { name: options.name ?? 'mcp-foundry', version: options.version ?? '0.0.1' };
 
@@ -110,6 +157,85 @@ export function createFoundryServer(options: FoundryServerOptions): Server {
       );
     }
     return mcp;
+  };
+
+  // 审批人授权按域裁决：principal 的角色须在单据所属系统的 RBAC 里标了 approver: true。
+  // 发起人重试消票走 /mcp 正常调用；这两个端点只做「看单/批单」，不代执行。
+  const rbacBySystem = new Map(options.systems.map((s) => [s.adapter.system, s.rbac]));
+  const isApprover = (principal: Principal, system: string): boolean =>
+    rbacBySystem.get(system)?.roles[principal.role]?.approver === true;
+
+  const handleApprovals = async (
+    req: IncomingMessage,
+    res: ServerResponse,
+    path: string,
+  ): Promise<void> => {
+    const approvals = options.approvals;
+    if (!approvals) {
+      sendJson(res, 501, { error: 'approvals store not configured' });
+      return;
+    }
+    const verdict = resolvePrincipal(req.headers, auth);
+    if (!verdict.ok) {
+      sendJson(res, 401, { error: verdict.message });
+      return;
+    }
+    const principal = verdict.principal;
+
+    if (path === '/approvals' && req.method === 'GET') {
+      const pending = await approvals.listPending();
+      const visible = pending.filter((r) => isApprover(principal, r.system));
+      sendJson(res, 200, { approvals: visible.map(approvalView) });
+      return;
+    }
+
+    const match = path.match(/^\/approvals\/([A-Za-z0-9-]+)$/);
+    if (match?.[1] !== undefined && req.method === 'POST') {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) chunks.push(chunk as Buffer);
+      let decision: unknown;
+      try {
+        ({ decision } = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+          decision?: unknown;
+        });
+      } catch {
+        sendJson(res, 400, { error: 'body must be JSON: {"decision":"approve"|"deny"}' });
+        return;
+      }
+      if (decision !== 'approve' && decision !== 'deny') {
+        sendJson(res, 400, { error: 'decision must be "approve" or "deny"' });
+        return;
+      }
+      const record = await approvals.get(match[1]);
+      if (!record) {
+        sendJson(res, 404, { error: 'approval not found' });
+        return;
+      }
+      if (!isApprover(principal, record.system)) {
+        sendJson(res, 403, {
+          error: `role ${principal.role} is not an approver for ${record.system}`,
+        });
+        return;
+      }
+      if (record.status !== 'pending') {
+        sendJson(res, 409, { error: `approval already ${record.status}` });
+        return;
+      }
+      try {
+        const decided = await approvals.decide(
+          record.id,
+          decision === 'approve' ? 'approved' : 'denied',
+          principal.userId,
+        );
+        sendJson(res, 200, approvalView(decided));
+      } catch (err) {
+        // decide 的状态校验竞态兜底（如恰好过期）
+        sendJson(res, 409, { error: err instanceof Error ? err.message : String(err) });
+      }
+      return;
+    }
+
+    sendJson(res, 405, { error: 'only GET /approvals and POST /approvals/{id} are served' });
   };
 
   const handleMcp = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
@@ -155,6 +281,10 @@ export function createFoundryServer(options: FoundryServerOptions): Server {
       if (path === '/healthz') {
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end('{"ok":true}');
+        return;
+      }
+      if (path === '/approvals' || path.startsWith('/approvals/')) {
+        await handleApprovals(req, res, path);
         return;
       }
       if (path !== '/mcp') {

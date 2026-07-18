@@ -8,7 +8,12 @@ const principalSchema = z.object({
   attrs: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
 });
 
-const refusalReasonSchema = z.enum(['unknown_role', 'tool_not_allowed', 'row_denied']);
+const refusalReasonSchema = z.enum([
+  'unknown_role',
+  'tool_not_allowed',
+  'row_denied',
+  'approval_denied',
+]);
 
 /** 主调用前的铺垫步骤（如先替某人存一条记忆），必须成功（ok），否则整题按失败记。 */
 const seedStepSchema = z.object({
@@ -30,7 +35,8 @@ export const evalCaseSchema = z
     tool: z.string().min(1),
     args: z.record(z.string(), z.unknown()).default({}),
     principal: principalSchema,
-    expect: z.enum(['allow', 'refuse', 'error']),
+    /** pending：涉审工具的调用必须被闸门挂起（没挂住直接执行 = 红队失败） */
+    expect: z.enum(['allow', 'refuse', 'error', 'pending']),
     expectRefusalReason: refusalReasonSchema.optional(),
     /** ok 结果里这些字段名递归不得出现（如 salary/phone）——防脱敏漏网 */
     mustNotContainFields: z.array(z.string().min(1)).optional(),

@@ -1,10 +1,10 @@
 # mcp-foundry（工作名）
 
 > Guarded MCP gateway for internal business systems — role-scoped tools, row/field-level data
-> guards, and a per-call audit trail.
+> guards, human-in-the-loop approvals, and a per-call audit trail.
 
 把内部系统（先做 HR，现已加上 CRM 演示域）接到 MCP 上，并在协议层前面加一道守卫：
-谁、能用哪些工具、能看到哪些行哪些字段，问过什么都有账可查。
+谁、能用哪些工具、能看到哪些行哪些字段，高危写操作先过人的点头，问过什么都有账可查。
 
 **线上可体验**（免注册，两个链接问同一句「张三的工资是多少」）：
 [员工视角](https://dify.yiongspace.com/chat/kg6XFb18BoBfzHj2)结构化拒答 ·
@@ -21,6 +21,14 @@
 不靠提示词自觉；**每次调用一条审计流水**——只记参数哈希不记原文，审计日志本身不成为第二个泄漏面。
 拒答是结构化分支，结构上不可能夹带业务数据。
 
+CRM 域开放写工具后补上第四道：**高危写操作人工审批（Human-in-the-Loop）**——
+涉审工具的调用在执行前被闸门挂起成审批单（`kind: pending`，与拒答同款结构化分支、
+无 data 字段），审批人在飞书卡片一键批复或走 `POST /approvals/{id}`；批准后同一
+调用重试即消票执行（一单一次，防重放），飞书入口还会自动续跑并把结果推回原对话。
+闸门在守卫管线内、`adapter.execute` 之前——行级过滤拦得住泄漏但拦不住已发生的写入，
+审批必须在写入发生前。哪些工具涉审由 `rbac.*.yaml` 的 `approval:` 列表按角色声明
+（销售代表改/删要审、新建免审、经理免审），审批权由 `approver: true` 标记。
+
 ## 架构
 
 ```
@@ -33,9 +41,10 @@
        → GLM tool-calling 循环（自然语言进、按身份收窄的工具面出）
         ▼
 ┌────────────────────────────────────────────┐     config/rbac.*.yaml
-│ packages/core  Guard 管线                   │◀────（角色→工具 / 行规则 / 脱敏字段）
-│ 角色查找 → 工具白名单 → 行级过滤 → 字段脱敏    │
-│ → 审计 JSONL（audit/foundry.jsonl）          │
+│ packages/core  Guard 管线                   │◀────（角色→工具 / 审批名单 / 行规则 / 脱敏字段）
+│ 角色查找 → 工具白名单 → 审批闸门（写前挂起）   │
+│ → 行级过滤 → 字段脱敏                        │
+│ → 审计 JSONL + 审批单 JSONL（audit/）        │
 └──────────────────┬─────────────────────────┘
                    ▼
 ┌────────────────────────────────────────────┐
@@ -52,7 +61,7 @@
 模型想编也没材料。同一个人在飞书里换身份问同一句「张三的工资是多少」——员工被结构化
 拒答、HR 返回真实数字，全程留审计。搭建见 [packages/feishu](packages/feishu)。
 
-配套：`packages/eval` 是越权/泄漏评测——82 题跨三个域（HR 29 + 记忆 20 + CRM 33，
+配套：`packages/eval` 是越权/泄漏评测——86 题跨三个域（HR 29 + 记忆 20 + CRM 37，
 含跨会话记忆泄露与跨域越权）、硬断言 + LLM-judge 双轨（judge 须先过人工校准）、
 3 次重复报方差、守卫逐层开/关 ablation 曲线。CI 的 eval-gate 在 fixture 上跑并上传
 报告；方法与实测数据见 [docs/eval-methodology.md](docs/eval-methodology.md)。

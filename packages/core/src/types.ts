@@ -28,19 +28,29 @@ export interface SystemAdapter {
   readonly system: string;
   tools(): ToolSpec[];
   execute(call: ToolCall, principal: Principal): Promise<AdapterResult>;
+  /**
+   * 可选：对「改写已存在行」的写工具，返回该调用将影响的现有行（前像），
+   * 供守卫在 execute 之前对前像跑行级归属校验——行级过滤跑在结果上，
+   * 拦得住读的泄漏，却拦不住已发生的写。返回 undefined 表示本工具无需前置校验
+   * （读工具、或 create 这类归属由自身盖戳的写工具）；返回 null 表示目标不存在。
+   * 不实现此方法 = 该系统没有需要前置归属校验的写工具。
+   */
+  preimage?(call: ToolCall): Promise<unknown>;
 }
 
 export interface AdapterResult {
   data: unknown;
 }
 
-export type RefusalReason = 'unknown_role' | 'tool_not_allowed' | 'row_denied';
+export type RefusalReason = 'unknown_role' | 'tool_not_allowed' | 'row_denied' | 'approval_denied';
 
 /**
  * 守卫管线的出口类型。
  * 拒答分支（refusal）没有 data 字段——结构上不可能夹带业务数据或模型文本。
+ * pending 分支同理：只带单号与规则指针，审批中的调用不存在任何业务数据可泄。
  */
 export type GuardedResult =
   | { kind: 'ok'; data: unknown; maskedFields: string[] }
   | { kind: 'refusal'; reason: RefusalReason; rule: string }
+  | { kind: 'pending'; reason: 'approval_required'; approvalId: string; rule: string }
   | { kind: 'error'; message: string };

@@ -27,6 +27,40 @@ export const opportunityIdInput = z.object({
 
 export const pipelineSummaryInput = z.object({});
 
+/** stage 钉死为 EspoCRM 缺省枚举——自由字符串会把脏值写进真库 */
+export const OPPORTUNITY_STAGES = [
+  'Prospecting',
+  'Qualification',
+  'Proposal',
+  'Negotiation',
+  'Closed Won',
+  'Closed Lost',
+] as const;
+
+export const createContactInput = z.object({
+  name: z.string().min(1),
+  title: z.string().min(1).optional(),
+  account_id: z.string().min(1).optional(),
+  email: z.string().min(1).optional(),
+  phone: z.string().min(1).optional(),
+});
+
+// 注意：保持裸 z.object，不要 .refine——MCP 服务器的 toRawShape 只收 ZodObject，
+// ZodEffects（.refine 的产物）会让整个 espocrm 工具面在 /mcp 注册时抛错。
+// 「至少改一个字段」的校验放在 adapter.execute 里做（见 requireAtLeastOnePatchField）。
+export const updateContactInput = z.object({
+  contact_id: z.string().min(1),
+  name: z.string().min(1).optional(),
+  title: z.string().min(1).optional(),
+  email: z.string().min(1).optional(),
+  phone: z.string().min(1).optional(),
+});
+
+export const updateOpportunityStageInput = z.object({
+  opportunity_id: z.string().min(1),
+  stage: z.enum(OPPORTUNITY_STAGES),
+});
+
 export const TOOL_SPECS: readonly ToolSpec[] = [
   {
     name: 'list_accounts',
@@ -69,5 +103,28 @@ export const TOOL_SPECS: readonly ToolSpec[] = [
     description:
       '按销售（owner）汇总业绩盘子：在途商机数与金额、已赢单数与金额——全员口径的经营数据',
     inputSchema: pipelineSummaryInput,
+  },
+  {
+    name: 'create_contact',
+    description:
+      '新建联系人（name 必填；title/account_id/email/phone 可选）；归属人自动取当前身份，不可指定',
+    inputSchema: createContactInput,
+  },
+  {
+    name: 'update_contact',
+    description:
+      '按 contact_id 修改联系人的 name/title/email/phone（至少一项）；联系人不存在时返回 null。此操作可能需要人工审批（返回 pending 时告知用户等待批复，勿重试）',
+    inputSchema: updateContactInput,
+  },
+  {
+    name: 'delete_contact',
+    description:
+      '按 contact_id 删除联系人，返回被删除的行；联系人不存在时返回 null。此操作可能需要人工审批（返回 pending 时告知用户等待批复，勿重试）',
+    inputSchema: contactIdInput,
+  },
+  {
+    name: 'update_opportunity_stage',
+    description: `按 opportunity_id 更新商机销售阶段（stage 取值：${OPPORTUNITY_STAGES.join('/')}）；商机不存在时返回 null。此操作可能需要人工审批（返回 pending 时告知用户等待批复，勿重试）`,
+    inputSchema: updateOpportunityStageInput,
   },
 ];

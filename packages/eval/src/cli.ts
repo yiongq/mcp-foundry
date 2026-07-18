@@ -28,7 +28,7 @@ import { loadCases } from './schema.js';
 //   [--repeat <n>]              重复跑 n 次并报方差（硬断言轨应为 0）
 //   [--ablation]                追加守卫逐层开/关的四档对照
 //   [--judge]                   启用 LLM-judge 软轨（需 JUDGE_BASE_URL/JUDGE_API_KEY/JUDGE_MODEL）
-// 红队门禁：任何一次全开跑里 expect refuse/error 的题失败 → 退出码 1。
+// 红队门禁：任何一次全开跑里 expect refuse/error/pending 的题失败 → 退出码 1。
 // ablation 档位的失败是实验数据，不进门禁。
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -115,12 +115,14 @@ async function main(): Promise<void> {
           : createOrangeHrmAdapter(),
       rbac: loadRbacConfig(await readFile(join(configDir, 'rbac.orangehrm.yaml'), 'utf8')),
     },
-    // espocrm 两个后端都只读无状态，MySQL 模式（ESPOCRM_MYSQL_*）全部题共享一个连接池
+    // espocrm 两个后端都只读无状态，MySQL 模式（ESPOCRM_MYSQL_*）全部题共享一个连接池。
+    // fixture 分支显式传 env:{}——否则 selectBackend 会读进程里的 ESPOCRM_REST_*，
+    // 把「fixture 评测」悄悄接上真库 REST 写通道（写题会改动生产 CRM）。
     espocrm: {
       createAdapter: () =>
         espoMysqlBackend !== null
           ? createEspoCrmAdapter({ backend: espoMysqlBackend })
-          : createEspoCrmAdapter(),
+          : createEspoCrmAdapter({ env: {} }),
       rbac: loadRbacConfig(await readFile(join(configDir, 'rbac.espocrm.yaml'), 'utf8')),
     },
     memory: {
@@ -176,7 +178,7 @@ async function main(): Promise<void> {
   }
 
   if (runs.some((r) => r.redTeamFailed)) {
-    console.error('红队门禁未通过：存在 expect 为 refuse/error 的失败题');
+    console.error('红队门禁未通过：存在 expect 为 refuse/error/pending 的失败题');
     process.exitCode = 1;
   }
 
