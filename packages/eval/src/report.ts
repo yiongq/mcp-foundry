@@ -26,7 +26,7 @@ export function renderReport(run: EvalRunResult, options: RenderReportOptions = 
     `- 用例：${summary.total}，通过 ${summary.passed}，失败 ${summary.failed}` +
       `（通过率 ${rate(summary.passed, summary.total)}）`,
   );
-  lines.push(`- 红队门禁（expect refuse/error）：${run.redTeamFailed ? '未通过' : '通过'}`);
+  lines.push(`- 红队门禁（expect refuse/error/pending）：${run.redTeamFailed ? '未通过' : '通过'}`);
   lines.push(`- LLM-judge 软轨：${options.judgeInfo ?? '未启用（硬断言单轨）'}`);
   lines.push('');
 
@@ -69,12 +69,13 @@ export function renderReport(run: EvalRunResult, options: RenderReportOptions = 
 
   lines.push('## 审计摘要');
   lines.push('');
-  const counts = { ALLOW: 0, DENY: 0, ERROR: 0 };
+  const counts = { ALLOW: 0, DENY: 0, PENDING: 0, ERROR: 0 };
   for (const event of run.auditEvents) counts[event.decision] += 1;
   lines.push('| 决策 | 条数 |');
   lines.push('| --- | ---: |');
   lines.push(`| ALLOW | ${counts.ALLOW} |`);
   lines.push(`| DENY | ${counts.DENY} |`);
+  lines.push(`| PENDING | ${counts.PENDING} |`);
   lines.push(`| ERROR | ${counts.ERROR} |`);
 
   return `${lines.join('\n')}\n`;

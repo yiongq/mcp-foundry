@@ -1,6 +1,8 @@
 import { createLarkChannel, LoggerLevel } from '@larksuiteoapi/node-sdk';
+import type { ApprovalStore, RbacConfig } from '@yiong/foundry-core';
 import type { AgentOptions } from './agent.js';
 import { answer } from './agent.js';
+import { buildApprovalCard, handleCardAction } from './approval.js';
 import type { IdentityMap } from './identity.js';
 import { resolvePrincipal } from './identity.js';
 
@@ -15,6 +17,16 @@ export interface BotConfig {
   /** 静态映射，或每条消息调用的加载器——后者支持改绑定免重启（见 serve.ts） */
   identityMap: IdentityMap | (() => Promise<IdentityMap>);
   agent: AgentOptions;
+  /**
+   * 审批环节（可选）。开启前提：飞书控制台已把 card.action.trigger 回调
+   * 订阅为「使用长连接接收」（与消息事件同一处配置，无需公网 URL）。
+   * approvalChatId 不设时审批卡片发到触发对话本身——单人 dogfood 的缺省形态。
+   */
+  approvals?: {
+    store: ApprovalStore;
+    rbacBySystem: ReadonlyMap<string, RbacConfig>;
+    approvalChatId?: string;
+  };
 }
 
 function errText(err: unknown): string {
@@ -75,11 +87,32 @@ export async function startBot(config: BotConfig): Promise<{ close: () => Promis
       console.error('[bot] 表情回应失败（不影响作答）:', errText(err));
       return null;
     });
+    // 本轮对话里闸门开出的审批单：答完统一出卡片（同参幂等命中同一张单，Set 去重）
+    const pendingApprovalIds = new Set<string>();
     try {
-      const reply = await answer(config.agent, principal, text, (tool) => {
-        console.log(`[bot] 执行工具 ${tool}`);
-      });
+      const reply = await answer(
+        config.agent,
+        principal,
+        text,
+        (tool) => {
+          console.log(`[bot] 执行工具 ${tool}`);
+        },
+        (_tool, result) => {
+          if (result.kind === 'pending') pendingApprovalIds.add(result.approvalId);
+        },
+      );
       await channel.send(msg.chatId, { markdown: signature(reply) }, sendOpts);
+
+      const approvals = config.approvals;
+      if (approvals && pendingApprovalIds.size > 0) {
+        for (const approvalId of pendingApprovalIds) {
+          // 先补挂原会话 id（批复后结果推得回来），再出卡片
+          const record = await approvals.store.annotate(approvalId, { chatId: msg.chatId });
+          await channel.send(approvals.approvalChatId ?? msg.chatId, {
+            card: buildApprovalCard(record),
+          });
+        }
+      }
     } catch (err) {
       // 错误细节只进日志，不进聊天——出口纪律与守卫一致
       console.error('[bot] 处理消息失败:', errText(err));
@@ -104,6 +137,28 @@ export async function startBot(config: BotConfig): Promise<{ close: () => Promis
       console.error('[bot] 未捕获异常:', errText(err));
     });
   });
+
+  const approvals = config.approvals;
+  if (approvals) {
+    channel.on('cardAction', (evt) => {
+      void handleCardAction(
+        {
+          store: approvals.store,
+          rbacBySystem: approvals.rbacBySystem,
+          toolset: config.agent.toolset,
+          identityMap: async () =>
+            typeof config.identityMap === 'function'
+              ? await config.identityMap()
+              : config.identityMap,
+          updateCard: (messageId, card) => channel.updateCard(messageId, card),
+          send: (chatId, content) => channel.send(chatId, content),
+        },
+        evt,
+      ).catch((err: unknown) => {
+        console.error('[bot] 审批卡片回调失败:', errText(err));
+      });
+    });
+  }
 
   await channel.connect();
   const identity = channel.botIdentity;

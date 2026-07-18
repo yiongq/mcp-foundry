@@ -219,10 +219,11 @@ hr_admin 返回真数字（18500 CNY）。
 ```bash
 # Caddyfile 的 foundry 块改成（/jwks.json 块保持原样不动）：
 #   foundry.yiongspace.com {
-#       handle /jwks.json { root * /opt/foundry-keys; file_server }
-#       handle /mcp*      { reverse_proxy 127.0.0.1:3100 }
-#       handle /healthz   { reverse_proxy 127.0.0.1:3100 }
-#       handle            { root * /opt/mcp-foundry/landing; file_server }
+#       handle /jwks.json   { root * /opt/foundry-keys; file_server }
+#       handle /mcp*        { reverse_proxy 127.0.0.1:3100 }
+#       handle /healthz     { reverse_proxy 127.0.0.1:3100 }
+#       handle /approvals*  { reverse_proxy 127.0.0.1:3100 }   # W9 审批决策端点，缺了会被 file_server 兜走
+#       handle              { root * /opt/mcp-foundry/landing; file_server }
 #   }
 caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
 
@@ -236,3 +237,29 @@ FOUNDRY_IDENTITY_KID=2026-07-vps bash smoke.sh                 # 五针仍全绿
 
 改完后浏览器打开 `foundry.yiongspace.com` 是产品落地页，不再是
 `only POST /mcp is served` 的 JSON-RPC 报错；`POST /mcp` 行为不变。
+
+## 13. 审批闸门（W9：涉审写工具 + /approvals 决策端点）
+
+代码随 rsync + rebuild 自动生效，无独立开关——闸门由 `config/rbac.espocrm.yaml`
+的 `approval:` 列表驱动（sales_rep 的 update/delete_contact、update_opportunity_stage
+涉审；create_contact 免审；sales_manager 免审且 `approver: true`）。单据落
+`/app/audit/approvals.jsonl`（与审计同卷，已被 §1 的 `audit/*.jsonl` 排除项覆盖，
+不会被 rsync 冲掉）。Caddy 需加 §12 里的 `/approvals*` 反代行。
+
+```bash
+# 验收（fixture 后端即可验，不需要真库/REST）：
+# ① 以 sales_rep 令牌调 delete_contact → kind=pending，拿到 approvalId
+# ② 以 sales_manager 令牌看单：
+curl -s https://foundry.yiongspace.com/approvals -H "Authorization: Bearer $MANAGER_TOKEN"
+# ③ 批准：
+curl -s -X POST https://foundry.yiongspace.com/approvals/<id> \
+  -H "Authorization: Bearer $MANAGER_TOKEN" -H 'content-type: application/json' \
+  -d '{"decision":"approve"}'
+# ④ 同一身份同参重试 ① → kind=ok（消票执行）；再试一次 → 新的 pending（票不复用）
+```
+
+飞书侧（独立进程，单据文件独立 `audit/approvals.feishu.jsonl`）：控制台
+「事件与回调」把 `card.action.trigger` 回调订阅为**使用长连接接收**即可，
+无需公网 URL；可选 `FEISHU_APPROVAL_CHAT_ID` 指定审批卡片投递会话（缺省发到
+触发对话本身）。真库写通道（可选）：EspoCRM 后台建 API 用户拿 X-Api-Key，
+`.env` 设 `ESPOCRM_REST_URL` + `ESPOCRM_REST_API_KEY`——不设时 MySQL 模式拒写。

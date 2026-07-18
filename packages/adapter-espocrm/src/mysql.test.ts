@@ -218,4 +218,24 @@ describe('MySqlEspoCrmBackend', () => {
     await backend.end();
     expect(ended).toBe(true);
   });
+
+  it('写方法一律拒绝且不发任何 SQL——三层只读纪律不为写破口', async () => {
+    const captured: { sql: string }[] = [];
+    const backend = new MySqlEspoCrmBackend({
+      ...OPTS,
+      executor: {
+        query: async (sql) => {
+          captured.push({ sql });
+          return [];
+        },
+        end: async () => {},
+      },
+    });
+
+    await expect(backend.createContact()).rejects.toThrow('只读');
+    await expect(backend.updateContact()).rejects.toThrow('只读');
+    await expect(backend.deleteContact()).rejects.toThrow('只读');
+    await expect(backend.updateOpportunityStage()).rejects.toThrow('只读');
+    expect(captured).toHaveLength(0);
+  });
 });

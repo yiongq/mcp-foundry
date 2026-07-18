@@ -16,6 +16,13 @@ const roleRuleSchema = z.object({
   tools: z.union([z.literal('*'), z.array(z.string().min(1))]),
   rows: z.array(rowRuleSchema).default([]),
   mask: z.array(z.string().min(1)).default([]),
+  /**
+   * 该角色调用这些工具须先经人工审批（与 tools 白名单独立：先过白名单，再过闸门）。
+   * 角色级列表而非工具级元数据——tools 可以是 "*"，无法在白名单内挂元数据。
+   */
+  approval: z.array(z.string().min(1)).default([]),
+  /** 该角色是否有权批复本域的审批单（在卡片/接口回调时校验点按人身份用） */
+  approver: z.boolean().default(false),
 });
 
 const rbacConfigSchema = z.object({

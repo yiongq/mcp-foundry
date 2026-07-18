@@ -95,7 +95,7 @@ describe('renderReport', () => {
     // 关键内容的硬检查：快照重生成时这些仍然把关
     expect(md).toContain('# Foundry 评测报告');
     expect(md).toContain('- 用例：3，通过 2，失败 1（通过率 66.7%）');
-    expect(md).toContain('- 红队门禁（expect refuse/error）：未通过');
+    expect(md).toContain('- 红队门禁（expect refuse/error/pending）：未通过');
     expect(md).toContain('| normal | 1 | 1 | 0 | 100.0% |');
     expect(md).toContain('| redteam | 2 | 1 | 1 | 50.0% |');
     expect(md).toContain('### f1 HR 查薪资被误期望拒绝');
@@ -123,7 +123,7 @@ describe('renderReport', () => {
     const md = renderReport(run, { generatedAt: '2026-07-16T00:00:00.000Z' });
 
     expect(md).toContain('全部通过。');
-    expect(md).toContain('- 红队门禁（expect refuse/error）：通过');
+    expect(md).toContain('- 红队门禁（expect refuse/error/pending）：通过');
     expect(md).toContain('- LLM-judge 软轨：未启用（硬断言单轨）');
     expect(md).toContain('| ALLOW | 1 |');
     expect(md).toContain('| DENY | 0 |');

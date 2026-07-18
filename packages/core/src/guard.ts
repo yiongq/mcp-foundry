@@ -1,3 +1,4 @@
+import type { ApprovalStore } from './approvals.js';
 import { type AuditLogger, hashArgs } from './audit.js';
 import { type RbacConfig, type RowRule, resolveSelfRef } from './rbac.js';
 import type { GuardedResult, Principal, SystemAdapter, ToolCall, ToolSpec } from './types.js';
@@ -5,12 +6,18 @@ import type { GuardedResult, Principal, SystemAdapter, ToolCall, ToolSpec } from
 /** 守卫的三道防线，评测 ablation 按此粒度逐层关闭以量化每层贡献。 */
 export type GuardLayer = 'rbac' | 'row_filter' | 'field_mask';
 
+/** 审批单默认有效期：足够审批人「几小时后才看到」，又不至于攒出一堆过期僵尸单 */
+const DEFAULT_APPROVAL_TTL_MS = 24 * 60 * 60 * 1000;
+
 export interface GuardOptions {
   /**
    * 仅供评测 ablation（守卫开/关对照实验）使用——生产路径永远全开。
    * 'rbac' 同时涵盖角色查找与工具白名单两个检查。
    */
   disabledLayers?: readonly GuardLayer[];
+  /** 审批闸门的单据存储。角色配置了 approval 列表却没接存储时，涉审调用一律报错（fail-closed）。 */
+  approvals?: ApprovalStore;
+  approvalTtlMs?: number;
 }
 
 /**
@@ -20,6 +27,8 @@ export interface GuardOptions {
  */
 export class Guard {
   private readonly disabled: ReadonlySet<GuardLayer>;
+  private readonly approvals: ApprovalStore | undefined;
+  private readonly approvalTtlMs: number;
 
   constructor(
     private readonly rbac: RbacConfig,
@@ -27,6 +36,8 @@ export class Guard {
     options: GuardOptions = {},
   ) {
     this.disabled = new Set(options.disabledLayers ?? []);
+    this.approvals = options.approvals;
+    this.approvalTtlMs = options.approvalTtlMs ?? DEFAULT_APPROVAL_TTL_MS;
   }
 
   /** tools/list 阶段就按角色收窄——不该用的工具连列表里都不出现 */
@@ -52,8 +63,17 @@ export class Guard {
         role: principal.role,
         system: adapter.system,
         tool: call.tool,
-        decision: result.kind === 'ok' ? 'ALLOW' : result.kind === 'refusal' ? 'DENY' : 'ERROR',
-        ...(result.kind === 'refusal' ? { reason: result.reason, rule: result.rule } : {}),
+        decision:
+          result.kind === 'ok'
+            ? 'ALLOW'
+            : result.kind === 'refusal'
+              ? 'DENY'
+              : result.kind === 'pending'
+                ? 'PENDING'
+                : 'ERROR',
+        ...(result.kind === 'refusal' || result.kind === 'pending'
+          ? { reason: result.reason, rule: result.rule }
+          : {}),
         latencyMs: Math.round(performance.now() - startedAt),
         argsHash: hashArgs(call.args),
       });
@@ -74,6 +94,85 @@ export class Guard {
       }
     }
 
+    // 写工具的行级归属前置校验：行级过滤跑在 execute 的结果上，能拦读的泄漏，
+    // 却拦不住已发生的写（删了同事的行再判权 = 数据已丢、审计还记成 DENY）。
+    // 对「改写已存在行」的写工具，先取前像跑同一套行级规则；不匹配即在 execute
+    // 前拒绝，且发生在审批之前——不该由他动的行，连审批单都不该开。
+    // 只对有行规则的角色 + 提供 preimage 的适配器生效；读工具 preimage 返回 undefined，
+    // 走原有的结果后置过滤，行为零变化。
+    let ownershipPreVerified = false;
+    if (
+      !this.disabled.has('row_filter') &&
+      role !== undefined &&
+      role.rows.length > 0 &&
+      adapter.preimage !== undefined
+    ) {
+      let pre: unknown;
+      try {
+        pre = await adapter.preimage(call);
+      } catch (err) {
+        return done({ kind: 'error', message: normalizeErrorMessage(err) });
+      }
+      // undefined = 无需前置校验（读/create）；null = 目标不存在，交给下方 execute 走缺失语义
+      if (pre !== undefined && pre !== null) {
+        const checked = applyRowRules(pre, role.rows, principal);
+        if (checked.denied) {
+          return done({ kind: 'refusal', reason: 'row_denied', rule: checked.rule });
+        }
+        ownershipPreVerified = true;
+      }
+    }
+
+    // 审批闸门：必须在 execute 之前——行级过滤在结果上跑，拦得住泄漏拦不住已发生的写入。
+    // 恢复语义是「重试消票」：同一发起人以同参重试，命中已批准的单即放行并消费，
+    // 天然适配无状态 HTTP 入口（无需挂起连接），飞书入口的自动续跑也是同一条路。
+    if (!this.disabled.has('rbac') && role !== undefined && role.approval.includes(call.tool)) {
+      if (!this.approvals) {
+        return done({
+          kind: 'error',
+          message: `工具 ${call.tool} 配置了人工审批，但服务未接入审批存储——涉审调用一律拒绝执行`,
+        });
+      }
+      const argsHash = hashArgs(call.args);
+      const ticket = await this.approvals.find(
+        adapter.system,
+        principal.userId,
+        call.tool,
+        argsHash,
+      );
+      if (!ticket) {
+        const created = await this.approvals.create({
+          system: adapter.system,
+          tool: call.tool,
+          args: call.args,
+          argsHash,
+          userId: principal.userId,
+          role: principal.role,
+          expiresAt: new Date(Date.now() + this.approvalTtlMs).toISOString(),
+        });
+        return done({
+          kind: 'pending',
+          reason: 'approval_required',
+          approvalId: created.id,
+          rule: `approval:${principal.role}`,
+        });
+      }
+      if (ticket.status === 'pending') {
+        return done({
+          kind: 'pending',
+          reason: 'approval_required',
+          approvalId: ticket.id,
+          rule: `approval:${principal.role}`,
+        });
+      }
+      // 已决单：无论批复结果如何都先消费——一张单只作用于一次调用，防重放
+      await this.approvals.consume(ticket.id);
+      if (ticket.status === 'denied') {
+        return done({ kind: 'refusal', reason: 'approval_denied', rule: `approval:${ticket.id}` });
+      }
+      // approved：放行，落到下方 execute
+    }
+
     let data: unknown;
     try {
       ({ data } = await adapter.execute(call, principal));
@@ -81,7 +180,9 @@ export class Guard {
       return done({ kind: 'error', message: normalizeErrorMessage(err) });
     }
 
-    if (!this.disabled.has('row_filter')) {
+    // 前像已核过归属的写工具跳过结果后置过滤（写结果就是刚授权的那一行，
+    // 再按行规则筛会把它误当读结果处理）；脱敏仍照常在下方施加。读工具照旧后置过滤。
+    if (!this.disabled.has('row_filter') && !ownershipPreVerified) {
       const filtered = applyRowRules(data, role?.rows ?? [], principal);
       if (filtered.denied) {
         return done({ kind: 'refusal', reason: 'row_denied', rule: filtered.rule });

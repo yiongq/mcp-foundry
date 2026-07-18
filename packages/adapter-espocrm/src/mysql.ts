@@ -265,6 +265,30 @@ export class MySqlEspoCrmBackend implements EspoCrmBackend {
       won_amount: Number(row.won_amount),
     }));
   }
+
+  // 写方法一律拒绝：foundry_ro 账号仅 SELECT，三层只读纪律（DB 权限/静态 SQL/LIMIT）不为写破口。
+  // 真实写入配置 ESPOCRM_REST_URL + ESPOCRM_REST_API_KEY 走 REST 组合（见 adapter.ts withRestWrites）。
+  async createContact(): Promise<never> {
+    throw readOnlyError('create_contact');
+  }
+
+  async updateContact(): Promise<never> {
+    throw readOnlyError('update_contact');
+  }
+
+  async deleteContact(): Promise<never> {
+    throw readOnlyError('delete_contact');
+  }
+
+  async updateOpportunityStage(): Promise<never> {
+    throw readOnlyError('update_opportunity_stage');
+  }
+}
+
+function readOnlyError(tool: string): Error {
+  return new Error(
+    `espocrm MySQL 后端只读，${tool} 不可用——写操作需配置 ESPOCRM_REST_URL + ESPOCRM_REST_API_KEY 启用 REST 写通道`,
+  );
 }
 
 function toOpportunityRow(row: Record<string, unknown>): OpportunityRow {

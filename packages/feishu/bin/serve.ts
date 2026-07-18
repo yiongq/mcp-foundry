@@ -16,7 +16,7 @@ import {
 } from '@yiong/foundry-adapter-espocrm';
 import { createMemoryAdapter, MemoryStore } from '@yiong/foundry-adapter-memory';
 import { createOrangeHrmAdapter, mysqlConfigFromEnv } from '@yiong/foundry-adapter-orangehrm';
-import { Guard, JsonlAuditLogger, loadRbacConfig } from '@yiong/foundry-core';
+import { Guard, JsonlApprovalStore, JsonlAuditLogger, loadRbacConfig } from '@yiong/foundry-core';
 import { startBot } from '../src/bot.js';
 import { loadIdentityMap } from '../src/identity.js';
 import { GuardedToolset } from '../src/toolset.js';
@@ -72,12 +72,21 @@ const loadIdentities = async (): Promise<typeof identityMap> => {
 };
 
 const audit = new JsonlAuditLogger(fileURLToPath(new URL('audit/foundry.jsonl', repoRoot)));
+// 审批单存储：飞书进程自己的文件（与 MCP 网关各管各的单——飞书单卡片批、
+// 网关单走 REST 端点批；两个进程不共享内存态，也就不共享单据文件）。
+// 存 args 原文（续跑必需），与审计同目录同纪律：不进 git、不出持久化卷。
+const approvalStore = new JsonlApprovalStore(
+  fileURLToPath(new URL('audit/approvals.feishu.jsonl', repoRoot)),
+);
 // 记忆存储进程级单例：跨会话记忆在 bot 生命周期内真实存续（重启即清，演示口径）
 const memoryStore = new MemoryStore();
 const toolset = new GuardedToolset([
-  { adapter: createOrangeHrmAdapter(), guard: new Guard(rbacHr, audit) },
-  { adapter: createEspoCrmAdapter(), guard: new Guard(rbacCrm, audit) },
-  { adapter: createMemoryAdapter(memoryStore), guard: new Guard(rbacMemory, audit) },
+  { adapter: createOrangeHrmAdapter(), guard: new Guard(rbacHr, audit, { approvals: approvalStore }) },
+  { adapter: createEspoCrmAdapter(), guard: new Guard(rbacCrm, audit, { approvals: approvalStore }) },
+  {
+    adapter: createMemoryAdapter(memoryStore),
+    guard: new Guard(rbacMemory, audit, { approvals: approvalStore }),
+  },
 ]);
 
 const boundCount = Object.keys(identityMap).length;
@@ -93,6 +102,18 @@ const bot = await startBot({
   appId: required('FEISHU_APP_ID'),
   appSecret: required('FEISHU_APP_SECRET'),
   identityMap: loadIdentities,
+  approvals: {
+    store: approvalStore,
+    rbacBySystem: new Map([
+      ['orangehrm', rbacHr],
+      ['espocrm', rbacCrm],
+      ['memory', rbacMemory],
+    ]),
+    // 不设则审批卡片发到触发对话本身（单人 dogfood 缺省）；设了发到指定会话（审批群）
+    ...(process.env.FEISHU_APPROVAL_CHAT_ID
+      ? { approvalChatId: process.env.FEISHU_APPROVAL_CHAT_ID }
+      : {}),
+  },
   agent: {
     toolset,
     llm: {

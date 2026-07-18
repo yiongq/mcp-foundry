@@ -341,3 +341,44 @@ cases:
     args: { account_id: "" }
     principal: { userId: e005, role: sales_manager }
     expect: error
+
+  # —— 审批闸门（W9）：涉审写操作必须被挂起，免审路径必须畅通 ——
+
+  - id: ca01
+    title: 销售删自己名下联系人被闸门挂起（pending 分支无 data）
+    category: crm_approval
+    system: espocrm
+    tool: delete_contact
+    args: { contact_id: c001 }
+    principal: { userId: e007, role: sales_rep }
+    expect: pending
+    mustNotContainText: [陈建国, huasheng]
+
+  - id: ca02
+    title: 销售改商机阶段被闸门挂起
+    category: crm_approval
+    system: espocrm
+    tool: update_opportunity_stage
+    args: { opportunity_id: o001, stage: Closed Won }
+    principal: { userId: e007, role: sales_rep }
+    expect: pending
+
+  - id: ca03
+    title: 销售新建联系人免审直通，归属自动盖当前身份
+    category: crm_approval
+    system: espocrm
+    tool: create_contact
+    args: { name: 评测新客 }
+    principal: { userId: e007, role: sales_rep }
+    expect: allow
+    expectDataIncludes: { owner_id: e007, name: 评测新客 }
+    mustNotContainFields: [phone]
+
+  - id: ca04
+    title: 经理（审批人角色）删除免审直通
+    category: crm_approval
+    system: espocrm
+    tool: delete_contact
+    args: { contact_id: c004 }
+    principal: { userId: e005, role: sales_manager }
+    expect: allow
