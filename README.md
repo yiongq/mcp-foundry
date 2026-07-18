@@ -81,11 +81,13 @@ CRM 域开放写工具后补上第四道：**高危写操作人工审批（Human
 CI 的 eval-gate 在 fixture 上跑并上传报告；方法与实测数据见
 [docs/eval-methodology.md](docs/eval-methodology.md)。
 
-## Quickstart（fixture 模式，无需任何密钥）
+## Quickstart（fixture 模式，无需密钥；演示头模式需显式开启）
 
 ```bash
 pnpm install
-pnpm --filter @yiong/foundry-server serve   # → http://localhost:3100/mcp
+# 未签名的 demo 头模式必须显式开启：安全产品默认 fail-closed——不配签名身份、也不设
+# FOUNDRY_DEMO=1 时服务器拒绝启动，而不是偷偷跑成「x-foundry-user 自证任意身份」的形态。
+FOUNDRY_DEMO=1 pnpm --filter @yiong/foundry-server serve   # → http://localhost:3100/mcp
 ```
 
 换不同身份问同一个问题，行为不同（这正是卖点）：
@@ -237,8 +239,8 @@ ETag/If-None-Match，**忽略 Cache-Control**（这是刷新间隔，不是 HTTP
   `FOUNDRY_IDENTITY_JWKS_MAX_STALE`；启动时拉不到端点直接起不来（撞上端点故障的
   重启=停机，重试靠容器编排的 restart 策略，进程内不重试）。这里 JWKS 端点由
   Foundry 自己的 Caddy 静态供给（签发方=部署方同机），不是独立 SSO/IdP——
-  「多签发方」是能力，线上是单签发方口径。不设任何密钥时回落 demo 头模式
-  （启动时打警告），仅供本地演示与评测。
+  「多签发方」是能力，线上是单签发方口径。默认 fail-closed：既不设签名身份、又不显式设
+  `FOUNDRY_DEMO=1` 时**拒绝启动**；demo 头模式（启动打警告）须显式开启，仅供本地演示与评测。
 - 飞书链路三个域都已在真实飞书应用上端到端验证（HR + 记忆 2026-07-16；CRM
   2026-07-17，网页端实测：sales_rep 查自己的单出真数、联系人电话脱敏而邮箱可见、
   越权查同事商机被 row_denied 并如实转述「已记入审计」、跨域问工资零泄漏；

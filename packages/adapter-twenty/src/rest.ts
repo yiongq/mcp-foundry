@@ -35,6 +35,8 @@ export interface TwentyRestOptions {
   ownerField?: string;
   /** 测试注入用；缺省全局 fetch */
   fetchImpl?: typeof fetch;
+  /** 单请求超时；缺省 10s，超时即抛（fail-closed），避免上游卡死时 requestListAll 逐页串行拉取被无限拖住 */
+  timeoutMs?: number;
 }
 
 const nameObj = z.object({
@@ -109,22 +111,36 @@ export class TwentyRestBackend implements TwentyBackend {
   private readonly baseUrl: string;
   private readonly ownerField: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly timeoutMs: number;
 
   constructor(private readonly options: TwentyRestOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.ownerField = options.ownerField ?? 'ownerId';
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.timeoutMs = options.timeoutMs ?? 10_000;
   }
 
   private async request(method: string, path: string, body?: unknown): Promise<unknown | null> {
-    const res = await this.fetchImpl(`${this.baseUrl}/rest${path}`, {
-      method,
-      headers: {
-        authorization: `Bearer ${this.options.apiKey}`,
-        ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
-      },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-    });
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}/rest${path}`, {
+        method,
+        headers: {
+          authorization: `Bearer ${this.options.apiKey}`,
+          ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+        },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        // 上游卡死不能拖垮整条调用链——超时即中止（requestListAll 会逐页串行拉取，每页都受此约束）
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === 'TimeoutError') {
+        throw new Error(`twenty REST ${method} ${path} 超时（>${this.timeoutMs}ms）`);
+      }
+      throw new Error(
+        `twenty REST ${method} ${path} 网络失败：${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
     if (res.status === 404) return null;
     if (!res.ok) {
       throw new Error(`twenty REST ${method} ${path} 失败：HTTP ${res.status}`);

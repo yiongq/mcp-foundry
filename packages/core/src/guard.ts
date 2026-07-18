@@ -124,8 +124,19 @@ export class Guard {
       } catch (err) {
         return done({ kind: 'error', message: normalizeErrorMessage(err) });
       }
-      // undefined = 无需前置校验（读/create）；null = 目标不存在，交给下方 execute 走缺失语义
-      if (pre !== undefined && pre !== null) {
+      // undefined = 无需前置校验（读工具、或 create 这类自身盖归属戳的写工具，preimage 未覆盖）。
+      // null = 目标不存在：对行级受限的写工具，返回与「存在但非本人」**完全一致**的 row_denied，
+      // 且不进入审批闸门、不落 execute。否则「不存在 → pending/『订单不存在』、越权 → row_denied」
+      // 的差异会成为越权枚举记录存在性的预言机；且每个伪造 id 都会凭空开一张审批单，灌爆
+      // approvals.jsonl 与审批人队列。rule 串与 applyRowRules 的越权分支同式，两种情形对调用方不可区分。
+      if (pre === null) {
+        return done({
+          kind: 'refusal',
+          reason: 'row_denied',
+          rule: role.rows.map((r) => `${r.field}==${r.equals}`).join(' && '),
+        });
+      }
+      if (pre !== undefined) {
         const checked = applyRowRules(pre, role.rows, principal);
         if (checked.denied) {
           return done({ kind: 'refusal', reason: 'row_denied', rule: checked.rule });
@@ -190,8 +201,15 @@ export class Guard {
           rule: `approval:${principal.role}`,
         });
       }
-      // 已决单：无论批复结果如何都先消费——一张单只作用于一次调用，防重放
-      await this.approvals.consume(ticket.id);
+      // 已决单：无论批复结果如何都先消费——一张单只作用于一次调用，防重放。
+      // consume 可能抛：并发重放的败者命中「已被消费」，或落盘失败。与 execute/preimage 的失败
+      // 一样接住并走结构化 error 出口——绝不放行执行（fail-closed），且照常留一条审计，
+      // 不让裸异常冒泡成 500 把这次调用从审计里漏掉。
+      try {
+        await this.approvals.consume(ticket.id);
+      } catch (err) {
+        return done({ kind: 'error', message: normalizeErrorMessage(err) });
+      }
       if (ticket.status === 'denied') {
         return done({ kind: 'refusal', reason: 'approval_denied', rule: `approval:${ticket.id}` });
       }

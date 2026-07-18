@@ -102,6 +102,25 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
+/**
+ * 带上限的请求体读取：累计字节超过 limit 即停止缓冲并返回 null（调用方回 413）。
+ * /mcp 的 JSON-RPC 体与 /approvals 的决策体都远小于 1 MiB——此前两处都无界缓冲，
+ * 单个大 POST 即可撑爆内存（出站 JWKS 拉取早已按字节封顶，入站这条一直是缺口）。
+ */
+const MAX_BODY_BYTES = 1024 * 1024;
+
+async function readBodyCapped(req: IncomingMessage, limit: number): Promise<Buffer | null> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of req) {
+    const buf = chunk as Buffer;
+    total += buf.byteLength;
+    if (total > limit) return null;
+    chunks.push(buf);
+  }
+  return Buffer.concat(chunks);
+}
+
 /** 审批单的对外投影：审批人必须看清在批什么，args 原文属于必要信息，不做二次省略 */
 function approvalView(record: {
   id: string;
@@ -191,11 +210,14 @@ export function createFoundryServer(options: FoundryServerOptions): Server {
 
     const match = path.match(/^\/approvals\/([A-Za-z0-9-]+)$/);
     if (match?.[1] !== undefined && req.method === 'POST') {
-      const chunks: Buffer[] = [];
-      for await (const chunk of req) chunks.push(chunk as Buffer);
+      const bodyBuf = await readBodyCapped(req, MAX_BODY_BYTES);
+      if (bodyBuf === null) {
+        sendJson(res, 413, { error: `request body exceeds ${MAX_BODY_BYTES} bytes` });
+        return;
+      }
       let decision: unknown;
       try {
-        ({ decision } = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+        ({ decision } = JSON.parse(bodyBuf.toString('utf8')) as {
           decision?: unknown;
         });
       } catch {
@@ -270,11 +292,14 @@ export function createFoundryServer(options: FoundryServerOptions): Server {
       return;
     }
     const principal = verdict.principal;
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) chunks.push(chunk as Buffer);
+    const bodyBuf = await readBodyCapped(req, MAX_BODY_BYTES);
+    if (bodyBuf === null) {
+      sendJsonRpcError(res, 413, `request body exceeds ${MAX_BODY_BYTES} bytes`);
+      return;
+    }
     let body: unknown;
     try {
-      body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      body = JSON.parse(bodyBuf.toString('utf8'));
     } catch {
       sendJsonRpcError(res, 400, 'parse error: body must be JSON');
       return;

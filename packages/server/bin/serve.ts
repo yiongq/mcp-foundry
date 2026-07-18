@@ -90,17 +90,19 @@ if (jwksSource) {
 } else if (secret) {
   auth = { mode: 'token', secret };
   identityBanner = 'identity: signed token (Authorization: Bearer …, mint via `pnpm mint-token`)';
-} else if (process.env.FOUNDRY_ENV === 'production' || process.env.NODE_ENV === 'production') {
-  // 生产铁律：绝不落回未签名的 demo 头模式。头模式下 x-foundry-user 可自证任意身份，
-  // 自审批等身份不变量形同虚设（发起人只要「自称」审批人就能批自己的单）。缺签名身份就
-  // 响亮地拒绝启动，而不是打个警告偷偷跑成不安全形态——把「静默不安全」变成「起不来」。
-  throw new Error(
-    '生产环境必须配置签名身份：设 FOUNDRY_IDENTITY_JWKS（推荐 ES256/RS256）或 FOUNDRY_IDENTITY_SECRET（HS256）。' +
-      '未签名的 demo 头模式（x-foundry-user 自证身份）仅供本地开发，拒绝在生产启动。',
-  );
-} else {
+} else if (process.env.FOUNDRY_DEMO === '1' || process.env.FOUNDRY_DEMO === 'true') {
+  // 未签名的 demo 头模式必须**显式**开启（FOUNDRY_DEMO=1），不再是「忘了配签名身份」时的
+  // 静默兜底。头模式下 x-foundry-user 可自证任意身份，自审批等身份不变量形同虚设（发起人
+  // 只要「自称」审批人就能批自己的单）。安全产品的默认必须 fail-closed：把不安全形态变成
+  // 一个需要主动打开的开关，而不是需要主动记得避免的陷阱——不再依赖 NODE_ENV=production 被设对。
   auth = { mode: 'headers' };
   identityBanner = '';
+} else {
+  // 既无签名身份、又未显式开 demo：拒绝启动，而不是偷偷跑成不安全形态。
+  throw new Error(
+    '必须配置签名身份：设 FOUNDRY_IDENTITY_JWKS（推荐 ES256/RS256）或 FOUNDRY_IDENTITY_SECRET（HS256）。' +
+      '仅本地演示可设 FOUNDRY_DEMO=1 显式启用未签名头模式（x-foundry-user 自证身份，任何人可自称任意角色）。',
+  );
 }
 
 // 调优旋钮只在 JWKS URL 模式下生效——其他模式下设了不能静默忽略（配置漂移的坑要出声）

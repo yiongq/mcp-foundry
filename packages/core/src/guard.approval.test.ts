@@ -464,3 +464,116 @@ describe('分级审批闸门（守卫端到端）', () => {
     expect(executed).toHaveLength(1);
   });
 });
+
+// ── 行级受限写工具：目标不存在与「非本人」不可区分，且都不开审批单 ─────────────────
+// 修复前：preimage 返回 null（目标不存在）时守卫跳过归属校验、径直进审批闸门开单，于是
+// 「不存在 → pending」与「越权 → row_denied」出现可区分差异——成了越权枚举记录存在性的预言机，
+// 且每个伪造 id 都会凭空生成一张审批单（灌爆 approvals.jsonl 与审批人队列）。
+const rowScopedRbac = loadRbacConfig(`
+roles:
+  sales_rep:
+    tools: [delete_contact]
+    approval: [delete_contact]
+    rows:
+      - field: owner_id
+        equals: $self.userId
+  sales_manager:
+    tools: "*"
+    approver: true
+`);
+
+/** preimage 适配器：'own' 属 e007、'other' 属别人、其余（如伪造 id）→ null（不存在）。 */
+function makeRowScopedCrm(): { adapter: SystemAdapter; executed: string[] } {
+  const executed: string[] = [];
+  const rows: Record<string, { id: string; owner_id: string } | undefined> = {
+    own: { id: 'own', owner_id: 'e007' },
+    other: { id: 'other', owner_id: 'e999' },
+  };
+  const adapter: SystemAdapter = {
+    system: 'fake-crm',
+    tools: () => [
+      {
+        name: 'delete_contact',
+        description: '删联系人',
+        inputSchema: z.object({ id: z.string() }),
+      },
+    ],
+    execute: async (call) => {
+      executed.push(call.tool);
+      return { data: { done: true } };
+    },
+    preimage: async (call) => {
+      const id = typeof call.args.id === 'string' ? call.args.id : undefined;
+      return id === undefined ? undefined : (rows[id] ?? null);
+    },
+  };
+  return { adapter, executed };
+}
+
+describe('行级受限写工具：不存在与越权不可区分，均不开单', () => {
+  it('目标不存在 → row_denied，不开审批单、不执行', async () => {
+    const { adapter, executed } = makeRowScopedCrm();
+    const audit = new MemoryAuditLogger();
+    const store = new MemoryApprovalStore();
+    const guard = new Guard(rowScopedRbac, audit, { approvals: store });
+
+    const result = await guard.invoke(adapter, REP, {
+      tool: 'delete_contact',
+      args: { id: 'ghost' },
+    });
+
+    expect(result.kind).toBe('refusal');
+    if (result.kind === 'refusal') expect(result.reason).toBe('row_denied');
+    expect(result).not.toHaveProperty('data');
+    expect(executed).toHaveLength(0);
+    // 关键：伪造 id 不再凭空开单（DoS/灌爆审批队列面被关闭）
+    expect(await store.listPending()).toHaveLength(0);
+    expect(audit.events.at(-1)?.decision).toBe('DENY');
+  });
+
+  it('目标存在但非本人 → row_denied，不开单、不执行', async () => {
+    const { adapter, executed } = makeRowScopedCrm();
+    const store = new MemoryApprovalStore();
+    const guard = new Guard(rowScopedRbac, new MemoryAuditLogger(), { approvals: store });
+
+    const result = await guard.invoke(adapter, REP, {
+      tool: 'delete_contact',
+      args: { id: 'other' },
+    });
+
+    expect(result.kind).toBe('refusal');
+    if (result.kind === 'refusal') expect(result.reason).toBe('row_denied');
+    expect(executed).toHaveLength(0);
+    expect(await store.listPending()).toHaveLength(0);
+  });
+
+  it('「不存在」与「非本人」对调用方完全不可区分（同 kind/reason/rule）—— 关闭存在性预言机', async () => {
+    const guard = new Guard(rowScopedRbac, new MemoryAuditLogger(), {
+      approvals: new MemoryApprovalStore(),
+    });
+    const ghost = await guard.invoke(makeRowScopedCrm().adapter, REP, {
+      tool: 'delete_contact',
+      args: { id: 'ghost' },
+    });
+    const notMine = await guard.invoke(makeRowScopedCrm().adapter, REP, {
+      tool: 'delete_contact',
+      args: { id: 'other' },
+    });
+    expect(ghost).toEqual(notMine);
+  });
+
+  it('自己名下的行仍照常开审批单（护栏未误伤正常路径）', async () => {
+    const { adapter, executed } = makeRowScopedCrm();
+    const store = new MemoryApprovalStore();
+    const guard = new Guard(rowScopedRbac, new MemoryAuditLogger(), { approvals: store });
+
+    const result = await guard.invoke(adapter, REP, {
+      tool: 'delete_contact',
+      args: { id: 'own' },
+    });
+
+    expect(result.kind).toBe('pending');
+    expect(executed).toHaveLength(0);
+    expect(await store.listPending()).toHaveLength(1);
+  });
+});

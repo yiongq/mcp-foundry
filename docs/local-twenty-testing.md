@@ -56,10 +56,10 @@ companies / people / opportunities / orders。**本地和线上都用它** → �
 
 ## 鉴权也要 parity
 
-本地默认是 demo 头模式(未签名,不能用来验证"防自批"这类身份不变量)。要贴近生产,本地也可跑
-签名身份:`pnpm --filter @yiong/foundry-server run keygen` 生成 ES256 密钥对,设
+本地演示头模式需显式 `FOUNDRY_DEMO=1`(未签名,不能用来验证"防自批"这类身份不变量)。要贴近
+生产,本地也可跑签名身份:`pnpm --filter @yiong/foundry-server run keygen` 生成 ES256 密钥对,设
 `FOUNDRY_IDENTITY_JWKS=<本地 jwks 路径>` 起网关,再用 `mint-token` 签令牌测。
-(生产已加护栏:设了 `FOUNDRY_ENV=production` 时缺签名身份直接拒绝启动,不会偷偷跑成头模式。)
+(护栏:默认 fail-closed——既无签名身份、又未设 `FOUNDRY_DEMO=1` 时直接拒绝启动,不会偷偷跑成头模式。)
 
 ## 注意
 
