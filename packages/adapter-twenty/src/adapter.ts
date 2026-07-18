@@ -13,6 +13,7 @@ import {
   accountIdInput,
   contactIdInput,
   createContactInput,
+  issueRefundInput,
   listAccountsInput,
   listContactsInput,
   listOpportunitiesInput,
@@ -125,6 +126,11 @@ class TwentyAdapter implements SystemAdapter {
         const { opportunity_id, stage } = updateOpportunityStageInput.parse(call.args);
         return { data: await this.backend.updateOpportunityStage(opportunity_id, stage) };
       }
+      case 'issue_refund': {
+        const input = issueRefundInput.parse(call.args);
+        // 身份核验 + 金额校验 + 记账都在后端；归属随订单盖戳，参数伪造不了
+        return { data: await this.backend.issueRefund(input) };
+      }
       default:
         throw new Error(`twenty: 未知工具 "${call.tool}"`);
     }
@@ -146,8 +152,20 @@ class TwentyAdapter implements SystemAdapter {
           ? undefined
           : await this.backend.getOpportunity(opportunityId);
       }
+      case 'issue_refund': {
+        // 退款也受行级归属约束：只退自己名下订单——前像取订单（含 owner_id），
+        // 守卫在审批与执行前核归属，越权退款连审批单都开不出来。
+        const orderId = arg('order_id');
+        return orderId === undefined ? undefined : await this.backend.getOrder(orderId);
+      }
       default:
         return undefined;
     }
+  }
+
+  /** 分级审批信号：退款按「本月已退笔数」分档，供守卫的 when 条件引用。 */
+  async approvalSignals(call: ToolCall, principal: Principal): Promise<Record<string, number>> {
+    if (call.tool !== 'issue_refund') return {};
+    return { refundCountThisMonth: await this.backend.refundCountThisMonth(principal.userId) };
   }
 }

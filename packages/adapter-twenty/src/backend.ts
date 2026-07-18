@@ -68,6 +68,39 @@ export interface UpdateContactPatch {
 }
 
 /**
+ * 订单（退款的身份核验锚点）：退款必须提供 order_id + 客户邮箱 + 卡尾号，与订单记录逐项对上
+ * 才可能落到退款 API——「身份核验前置于资金动作」。owner_id 使退款也受行级归属约束
+ * （只退自己名下订单）。演示口径：真实 Twenty 无订单/退款对象，仅 fixture 后端提供。
+ */
+export interface OrderRow {
+  order_id: string;
+  account_id: string;
+  email: string;
+  last_four: string;
+  amount_paid: number;
+  currency: string;
+  owner_id: string;
+}
+
+export interface RefundInput {
+  order_id: string;
+  email: string;
+  last_four: string;
+  amount: number;
+  reason?: string | undefined;
+}
+
+export interface RefundResult {
+  refund_id: string;
+  order_id: string;
+  account_id: string;
+  amount: number;
+  currency: string;
+  status: 'issued';
+  owner_id: string;
+}
+
+/**
  * 数据来源抽象：fixture（内置演示数据）与 Twenty REST 各实现一份。
  * 写方法约定：目标不存在返回 null；update/delete 返回受影响的完整行
  * （必须含 owner_id——守卫行级过滤在返回值上跑，缺归属字段会被误拒）。
@@ -84,4 +117,10 @@ export interface TwentyBackend {
   updateContact(contactId: string, patch: UpdateContactPatch): Promise<ContactRow | null>;
   deleteContact(contactId: string): Promise<ContactRow | null>;
   updateOpportunityStage(opportunityId: string, stage: string): Promise<OpportunityRow | null>;
+  /** 退款目标订单（守卫据此做行级归属前置校验；不存在返回 null） */
+  getOrder(orderId: string): Promise<OrderRow | null>;
+  /** 退款：身份核验（邮箱+卡尾号对上订单）+ 金额不超已付 + 记账计数。核验不过即抛。 */
+  issueRefund(input: RefundInput): Promise<RefundResult>;
+  /** 分级信号：某人本周期已成功退款笔数（供审批闸门按频次分档）。 */
+  refundCountThisMonth(ownerId: string): Promise<number>;
 }

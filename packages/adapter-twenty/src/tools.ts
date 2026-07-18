@@ -61,6 +61,16 @@ export const updateOpportunityStageInput = z.object({
   stage: z.enum(OPPORTUNITY_STAGES),
 });
 
+// 退款：身份核验字段（order_id + email + last_four）必须与订单对上；amount 正数。
+// last_four 固定 4 位数字——卡尾号口径，也顺带挡住把整卡号塞进来。
+export const issueRefundInput = z.object({
+  order_id: z.string().min(1),
+  email: z.string().min(1),
+  last_four: z.string().regex(/^\d{4}$/, 'last_four 须为 4 位数字（卡尾号）'),
+  amount: z.number().positive(),
+  reason: z.string().min(1).optional(),
+});
+
 export const TOOL_SPECS: readonly ToolSpec[] = [
   {
     name: 'list_accounts',
@@ -125,5 +135,11 @@ export const TOOL_SPECS: readonly ToolSpec[] = [
     name: 'update_opportunity_stage',
     description: `按 opportunity_id 更新商机销售阶段（stage 取值：${OPPORTUNITY_STAGES.join('/')}）；商机不存在时返回 null。此操作可能需要人工审批（返回 pending 时告知用户等待批复，勿重试）`,
     inputSchema: updateOpportunityStageInput,
+  },
+  {
+    name: 'issue_refund',
+    description:
+      '给客户订单退款。必须提供 order_id、客户邮箱 email、卡尾号 last_four（4 位）与退款金额 amount，三项身份凭据须与订单对上才受理；只能退自己名下订单。按金额与频次分级：小额自动放行，超额或本月频繁退款须人工审批（返回 pending 时告知用户等待批复，勿重试）',
+    inputSchema: issueRefundInput,
   },
 ];

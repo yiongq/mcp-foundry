@@ -7,8 +7,8 @@ import { createTwentyAdapter } from './adapter.js';
 const adapter = createTwentyAdapter({ env: {} });
 const CALLER: Principal = { userId: 'e000', role: 'test' };
 
-describe('twenty fixture：七读四写', () => {
-  it('tools() 恰好 11 个，名称与顺序稳定', () => {
+describe('twenty fixture：七读五写', () => {
+  it('tools() 恰好 12 个，名称与顺序稳定', () => {
     expect(adapter.system).toBe('twenty');
     expect(adapter.tools().map((t) => t.name)).toEqual([
       'list_accounts',
@@ -22,6 +22,7 @@ describe('twenty fixture：七读四写', () => {
       'update_contact',
       'delete_contact',
       'update_opportunity_stage',
+      'issue_refund',
     ]);
   });
 
@@ -178,5 +179,84 @@ describe('rbac.twenty.yaml 与守卫联动（守卫与后端无关）', () => {
     if (r.kind === 'refusal') expect(r.reason).toBe('row_denied');
     const still = await a.execute({ tool: 'get_contact', args: { contact_id: 'c003' } }, WANG_WU);
     expect((still.data as { contact_id: string }).contact_id).toBe('c003');
+  });
+
+  const REFUND_OK = {
+    order_id: 'ord-1001',
+    email: 'chenjianguo@huasheng.example.com',
+    last_four: '4321',
+  };
+
+  it('退款身份核验通过 → 落账，归属随订单（e007）不取参数', async () => {
+    const a = createTwentyAdapter({ env: {} });
+    const { data } = await a.execute(
+      { tool: 'issue_refund', args: { ...REFUND_OK, amount: 200 } },
+      SUN_QI,
+    );
+    expect(data).toMatchObject({
+      status: 'issued',
+      order_id: 'ord-1001',
+      amount: 200,
+      owner_id: 'e007',
+    });
+  });
+
+  it('退款身份核验不过（卡尾号错）→ 抛错不落账', async () => {
+    const a = createTwentyAdapter({ env: {} });
+    await expect(
+      a.execute(
+        { tool: 'issue_refund', args: { ...REFUND_OK, last_four: '0000', amount: 200 } },
+        SUN_QI,
+      ),
+    ).rejects.toThrow('身份核验');
+  });
+
+  it('退款金额超过订单已付 → 抛错', async () => {
+    const a = createTwentyAdapter({ env: {} });
+    await expect(
+      a.execute({ tool: 'issue_refund', args: { ...REFUND_OK, amount: 999_999_999 } }, SUN_QI),
+    ).rejects.toThrow('超过订单已付');
+  });
+
+  it('approvalSignals 报本月已退笔数；preimage 取订单（含归属）供守卫核验', async () => {
+    const a = createTwentyAdapter({ env: {} });
+    const call = { tool: 'issue_refund', args: { ...REFUND_OK, amount: 100 } };
+    expect(await a.approvalSignals?.(call, SUN_QI)).toEqual({ refundCountThisMonth: 0 });
+    await a.execute(call, SUN_QI);
+    expect(await a.approvalSignals?.(call, SUN_QI)).toEqual({ refundCountThisMonth: 1 });
+    expect(
+      await a.preimage?.({ tool: 'issue_refund', args: { order_id: 'ord-2001' } }),
+    ).toMatchObject({ order_id: 'ord-2001', owner_id: 'e008' });
+  });
+
+  it('守卫分级：孙七小额退款自动放行、大额挂起', async () => {
+    const a = createTwentyAdapter({ env: {} });
+    const guard = await loadGuard();
+    const small = await guard.invoke(a, SUN_QI, {
+      tool: 'issue_refund',
+      args: { ...REFUND_OK, amount: 200 },
+    });
+    expect(small.kind).toBe('ok');
+    const big = await guard.invoke(a, SUN_QI, {
+      tool: 'issue_refund',
+      args: { ...REFUND_OK, amount: 8000 },
+    });
+    expect(big.kind).toBe('pending');
+  });
+
+  it('守卫：孙七退同事名下订单 ord-2001 → 审批/核验前就 row_denied', async () => {
+    const a = createTwentyAdapter({ env: {} });
+    const guard = await loadGuard();
+    const r = await guard.invoke(a, SUN_QI, {
+      tool: 'issue_refund',
+      args: {
+        order_id: 'ord-2001',
+        email: 'zhoutao@qiming.example.com',
+        last_four: '1111',
+        amount: 100,
+      },
+    });
+    expect(r.kind).toBe('refusal');
+    if (r.kind === 'refusal') expect(r.reason).toBe('row_denied');
   });
 });

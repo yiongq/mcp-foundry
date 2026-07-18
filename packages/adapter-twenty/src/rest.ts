@@ -6,7 +6,10 @@ import type {
   ContactRow,
   CreateContactInput,
   OpportunityRow,
+  OrderRow,
   PipelineSummaryRow,
+  RefundInput,
+  RefundResult,
   TwentyBackend,
   UpdateContactPatch,
 } from './backend.js';
@@ -339,5 +342,22 @@ export class TwentyRestBackend implements TwentyBackend {
     );
     const one = this.unwrapOne(body, 'updateOpportunity', 'opportunity');
     return one === null ? null : this.toOpportunityRow(one);
+  }
+
+  // 退款是 fixture 演示能力：真实 Twenty 无「订单/退款」对象，故 REST 后端不支持。
+  // getOrder 返回 null（守卫前像走缺失语义），issueRefund 显式抛错——线上调用会得到
+  // 结构化 error，而不是静默假成功。要接真实支付需另建订单/退款域适配器。
+  async getOrder(_orderId: string): Promise<OrderRow | null> {
+    return null;
+  }
+
+  async issueRefund(_input: RefundInput): Promise<RefundResult> {
+    throw new Error(
+      'issue_refund 是 fixture 演示能力：真实 Twenty 无订单/退款对象，REST 后端不支持',
+    );
+  }
+
+  async refundCountThisMonth(_ownerId: string): Promise<number> {
+    return 0;
   }
 }

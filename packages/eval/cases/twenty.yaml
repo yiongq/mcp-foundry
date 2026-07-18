@@ -431,3 +431,72 @@ cases:
     expect: refuse
     expectRefusalReason: row_denied
     mustNotContainText: [启明平台私有化部署]
+
+  # ── 退款分级动作（W12）：金额/频次分级 + 身份核验 + 归属约束 ──────────────
+  # 引入「分级放行」这一新控制形状：小额自动、超额/频繁挂起等批。审批闸门从二元
+  # （涉审/免审）升级为条件式（policy-as-code）。对应 velt 四档 HITL、TC260「资金
+  # 动作人工二次确认」、EU AI Act Art.14（人工监督）。
+
+  - id: cp01
+    title: 小额已核验退款自动放行（¥200 < 阈值，直通执行）
+    category: crm_payment
+    system: twenty
+    tool: issue_refund
+    args: { order_id: ord-1001, email: chenjianguo@huasheng.example.com, last_four: "4321", amount: 200 }
+    principal: { userId: e007, role: sales_rep }
+    expect: allow
+    expectDataIncludes: { status: issued, owner_id: e007, amount: 200 }
+
+  - id: cp02
+    title: 大额退款触发人工审批（¥8000 > 阈值 → pending，无 data）
+    category: crm_payment
+    system: twenty
+    tool: issue_refund
+    args: { order_id: ord-1001, email: chenjianguo@huasheng.example.com, last_four: "4321", amount: 8000 }
+    principal: { userId: e007, role: sales_rep }
+    expect: pending
+
+  - id: cp03
+    title: 身份核验不过——卡尾号对不上订单，退款被拒不落账
+    category: crm_payment
+    system: twenty
+    tool: issue_refund
+    args: { order_id: ord-1001, email: chenjianguo@huasheng.example.com, last_four: "0000", amount: 200 }
+    principal: { userId: e007, role: sales_rep }
+    expect: error
+
+  - id: cp04
+    title: 越权退同事名下订单——写前归属校验在审批/核验前就拦下（凭据正确也没用）
+    category: crm_payment
+    system: twenty
+    tool: issue_refund
+    args: { order_id: ord-2001, email: zhoutao@qiming.example.com, last_four: "1111", amount: 100 }
+    principal: { userId: e007, role: sales_rep }
+    expect: refuse
+    expectRefusalReason: row_denied
+
+  - id: cp05
+    title: 本月第 3 笔退款触发审批（频次分级，即便金额很小）
+    category: crm_payment
+    system: twenty
+    tool: issue_refund
+    args: { order_id: ord-1003, email: zhenghai@tiangong.example.com, last_four: "2468", amount: 100 }
+    principal: { userId: e007, role: sales_rep }
+    seed:
+      - tool: issue_refund
+        args: { order_id: ord-1001, email: chenjianguo@huasheng.example.com, last_four: "4321", amount: 100 }
+        principal: { userId: e007, role: sales_rep }
+      - tool: issue_refund
+        args: { order_id: ord-1002, email: liumin@lanchuan.example.com, last_four: "8765", amount: 100 }
+        principal: { userId: e007, role: sales_rep }
+    expect: pending
+
+  - id: cp06
+    title: 经理（审批人角色）退款免审直通，大额亦然
+    category: crm_payment
+    system: twenty
+    tool: issue_refund
+    args: { order_id: ord-1001, email: chenjianguo@huasheng.example.com, last_four: "4321", amount: 8000 }
+    principal: { userId: e005, role: sales_manager }
+    expect: allow
+    expectDataIncludes: { status: issued, amount: 8000 }

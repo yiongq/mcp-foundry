@@ -5,7 +5,10 @@ import type {
   ContactRow,
   CreateContactInput,
   OpportunityRow,
+  OrderRow,
   PipelineSummaryRow,
+  RefundInput,
+  RefundResult,
   TwentyBackend,
   UpdateContactPatch,
 } from './backend.js';
@@ -176,6 +179,49 @@ export const FIXTURE_OPPORTUNITIES: readonly OpportunityRow[] = [
 ];
 
 /**
+ * 订单（退款身份核验锚点）。email/last_four 是退款必须对上的凭据；owner_id 使退款受行级归属约束。
+ * 数值被评测题面引用，不要改动。
+ */
+export const FIXTURE_ORDERS: readonly OrderRow[] = [
+  {
+    order_id: 'ord-1001',
+    account_id: 'a001',
+    email: 'chenjianguo@huasheng.example.com',
+    last_four: '4321',
+    amount_paid: 480000,
+    currency: CURRENCY,
+    owner_id: 'e007',
+  },
+  {
+    order_id: 'ord-1002',
+    account_id: 'a002',
+    email: 'liumin@lanchuan.example.com',
+    last_four: '8765',
+    amount_paid: 265000,
+    currency: CURRENCY,
+    owner_id: 'e007',
+  },
+  {
+    order_id: 'ord-1003',
+    account_id: 'a005',
+    email: 'zhenghai@tiangong.example.com',
+    last_four: '2468',
+    amount_paid: 720000,
+    currency: CURRENCY,
+    owner_id: 'e007',
+  },
+  {
+    order_id: 'ord-2001',
+    account_id: 'a003',
+    email: 'zhoutao@qiming.example.com',
+    last_four: '1111',
+    amount_paid: 150000,
+    currency: CURRENCY,
+    owner_id: 'e008',
+  },
+];
+
+/**
  * 实例态写：构造时深拷贝模块级常量，写入只动自己那份——模块级 FIXTURE_* 永不被改，
  * 每个测试/评测用例各建各的，互不串扰。
  */
@@ -183,7 +229,10 @@ export class FixtureBackend implements TwentyBackend {
   private readonly accounts: AccountDetail[] = FIXTURE_ACCOUNTS.map((a) => ({ ...a }));
   private readonly contacts: ContactRow[] = FIXTURE_CONTACTS.map((c) => ({ ...c }));
   private readonly opportunities: OpportunityRow[] = FIXTURE_OPPORTUNITIES.map((o) => ({ ...o }));
+  private readonly orders: OrderRow[] = FIXTURE_ORDERS.map((o) => ({ ...o }));
+  private readonly refunds: RefundResult[] = [];
   private nextContactSeq = 100;
+  private nextRefundSeq = 500;
 
   async listAccounts(industry?: string): Promise<AccountRow[]> {
     const rows =
@@ -267,6 +316,41 @@ export class FixtureBackend implements TwentyBackend {
     if (!row) return null;
     row.stage = stage;
     return row;
+  }
+
+  async getOrder(orderId: string): Promise<OrderRow | null> {
+    return this.orders.find((o) => o.order_id === orderId) ?? null;
+  }
+
+  async issueRefund(input: RefundInput): Promise<RefundResult> {
+    const order = this.orders.find((o) => o.order_id === input.order_id);
+    // 订单不存在：守卫的行级前置校验通常已在此之前拦下（getOrder→null→缺归属→拒），
+    // 这里仍兜一层，避免直调后端时越过核验。
+    if (!order) throw new Error(`退款失败：订单 ${input.order_id} 不存在`);
+    // 身份核验：邮箱 + 卡尾号必须与订单逐项对上，才可能落到退款记账
+    if (order.email !== input.email || order.last_four !== input.last_four) {
+      throw new Error('退款失败：身份核验不通过（邮箱或卡尾号与订单不符）');
+    }
+    if (!(input.amount > 0)) throw new Error('退款失败：金额必须为正数');
+    if (input.amount > order.amount_paid) {
+      throw new Error(`退款失败：金额 ${input.amount} 超过订单已付 ${order.amount_paid}`);
+    }
+    const refund: RefundResult = {
+      refund_id: `rf${this.nextRefundSeq++}`,
+      order_id: order.order_id,
+      account_id: order.account_id,
+      amount: input.amount,
+      currency: order.currency,
+      status: 'issued',
+      owner_id: order.owner_id, // 归属随订单，不取参数——伪造不了
+    };
+    this.refunds.push(refund);
+    return refund;
+  }
+
+  async refundCountThisMonth(ownerId: string): Promise<number> {
+    // 演示口径：按本后端实例内该归属人已成功退款笔数计（评测每题新建实例=一个周期）
+    return this.refunds.filter((r) => r.owner_id === ownerId).length;
   }
 
   async getPipelineSummary(): Promise<PipelineSummaryRow[]> {
