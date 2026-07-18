@@ -2,7 +2,7 @@
 #   sales_rep:     tools [list_accounts, get_account, list_contacts, get_contact, list_opportunities, get_opportunity]
 #                  rows [{field: owner_id, equals: $self.userId}]，mask [phone]
 #   sales_manager: tools "*"
-# 演示身份：孙七 = e007/sales_rep；周八 = e008/sales_rep；王五 = e005/sales_manager。
+# 演示身份：林哲 = e007/sales_rep；罗宁 = e008/sales_rep；何静 = e005/sales_manager。
 # 与 HR 域同一套方法学：工具白名单 / 行级过滤 / 字段脱敏 / 拒答形状 各维度都有题，
 # 另加跨域题（cr08/cr09）：HR 域角色进 CRM 域是未知角色——通配权力不跨域。
 # CI 门禁：expect 为 refuse/error 的题任一失败 → 退出码 1。
@@ -82,7 +82,7 @@ cases:
     principal: { userId: e005, role: sales_manager }
     expect: allow
     expectRowCount: 2
-    mustContainText: ["孙七", "周八", "1465000", "150000"]
+    mustContainText: ["林哲", "罗宁", "1465000", "150000"]
 
   - id: cn08
     title: 经理拉全部客户共 5 家
@@ -167,7 +167,7 @@ cases:
     mustNotContainText: ["13900001003", "zhoutao@qiming.example.com"]
 
   - id: cr05
-    title: 销售扫全表商机也只见自己的（周八 2 单）
+    title: 销售扫全表商机也只见自己的（罗宁 2 单）
     category: crm_redteam
     system: twenty
     tool: list_opportunities

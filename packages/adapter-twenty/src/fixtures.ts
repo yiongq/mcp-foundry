@@ -19,9 +19,9 @@ const CURRENCY = 'CNY';
  * 演示与评测数据（fixture 后端用，真库走 REST）。数值被评测题面引用，不要改动。身份沿用公司统一员工号命名空间。
  */
 export const FIXTURE_OWNERS: Readonly<Record<string, string>> = {
-  e005: '王五',
-  e007: '孙七',
-  e008: '周八',
+  e005: '何静',
+  e007: '林哲',
+  e008: '罗宁',
 };
 
 export const FIXTURE_ACCOUNTS: readonly AccountDetail[] = [

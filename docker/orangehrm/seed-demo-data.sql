@@ -51,7 +51,7 @@ INSERT INTO hs_hr_employee
   (4, 'e003', '李四', '', '', 'lisi@example.com', '13800000003',
     (SELECT id FROM ohrm_job_title WHERE job_title = '班组长'),
     (SELECT id FROM ohrm_subunit WHERE name = '生产部')),
-  (5, 'e005', '王五', '', '', 'wangwu@example.com', '13800000005',
+  (5, 'e005', '何静', '', '', 'hejing@example.com', '13800000005',
     (SELECT id FROM ohrm_job_title WHERE job_title = '商务经理'),
     (SELECT id FROM ohrm_subunit WHERE name = '商务部')),
   (6, 'e006', '赵六', '', '', 'zhaoliu@example.com', '13800000006',

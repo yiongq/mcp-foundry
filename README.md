@@ -120,14 +120,14 @@ tail -3 audit/foundry.jsonl
 销售看不到全员业绩盘，HR 的通配权力跨不进 CRM——
 
 ```bash
-# 孙七（sales_rep）想看全员业绩盘 → 白名单拒绝（这工具在他的 tools/list 里根本不出现）
+# 林哲（sales_rep）想看全员业绩盘 → 白名单拒绝（这工具在他的 tools/list 里根本不出现）
 curl -s http://localhost:3100/mcp \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
   -H 'x-foundry-user: e007' -H 'x-foundry-role: sales_rep' \
   -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_pipeline_summary","arguments":{}}}'
 
-# 王五（sales_manager）看业绩盘 → 正常返回
+# 何静（sales_manager）看业绩盘 → 正常返回
 curl -s http://localhost:3100/mcp \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \

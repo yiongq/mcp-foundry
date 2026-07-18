@@ -1,4 +1,4 @@
-# Twenty CRM 演示 RBAC。同一套权限模型与 demo 身份（孙七 sales_rep / 王五 sales_manager）
+# Twenty CRM 演示 RBAC。同一套权限模型与 demo 身份（林哲 sales_rep / 何静 sales_manager）
 # 与后端解耦：CRM 域换适配器（本项目从早期后端迁到 Twenty）不改这份规则。
 # 这正是「守卫与后端无关」的配置层证据。
 roles:
