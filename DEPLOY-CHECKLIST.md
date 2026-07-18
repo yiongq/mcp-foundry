@@ -126,7 +126,9 @@ docker compose logs server | tail -5   # 等 migration 跑完、健康
 浏览器开 `https://twenty.yiongspace.com` 建工作区管理员，然后：
 
 - Settings → API & Webhooks 生成 API key（记到本机 `~/.config/mcp-foundry/twenty-api-key.txt`，600）
-- 给 People / Companies / Opportunities 建归属自定义字段（本项目用 `accountOwnerId`），
+- 给 People / Companies / Opportunities（以及退款的 Order/Refund 自定义对象）建归属自定义
+  字段 `repCode`（TEXT，值=令牌 userId 如 e007；不用内建 accountOwnerId——它是 workspaceMember
+  UUID，与员工号口径对不上，见 docs/twenty-notes.md），
   否则 `owner_id` 归属为空、行级过滤会「宁可错拒」（见 [docs/twenty-notes.md](docs/twenty-notes.md)）
 - 灌入演示数据（5 客户 / 5 联系人 / 5 商机 / 3 个销售身份的 owner 分布）
 
@@ -136,7 +138,7 @@ docker compose logs server | tail -5   # 等 migration 跑完、健康
 # /opt/mcp-foundry/.env
 TWENTY_API_URL=http://host.docker.internal:3200
 TWENTY_API_KEY=<上面的 API key>
-TWENTY_OWNER_FIELD=accountOwnerId
+TWENTY_OWNER_FIELD=repCode
 docker compose up -d --force-recreate   # restart 不重载 .env，必须 force-recreate
 docker compose logs foundry-server | tail -3   # 应见 "crm backend: twenty（REST 真库）"
 ```
@@ -212,17 +214,19 @@ BASE=https://foundry.yiongspace.com \
 FOUNDRY_IDENTITY_KEY=~/.config/mcp-foundry/identity-es256.key \
 FOUNDRY_IDENTITY_KID=2026-07-vps bash smoke.sh   # 五针全绿
 
-# ⑤ 签长效令牌（本机私钥），更新 LangGraph 客户端 .env 的 FOUNDRY_MCP_TOKEN
-#   （线上 CRM 前端以 sales_manager 身份连网关；需要别的身份就换 --role/--user）
+# ⑤ 签长效令牌（本机私钥）。线上 CRM 前端以 **sales_rep（e007）** 身份连网关——
+#   千万别用 sales_manager，它 approver 且免审，会静默关掉高危写审批（HITL 演不出来）。
 pnpm --filter @yiong/foundry-server run mint-token \
   --key ~/.config/mcp-foundry/identity-es256.key --kid 2026-07-vps \
-  --user sales_manager --role sales_manager --ttl 31536000
+  --user e007 --role sales_rep --ttl 31536000
 ```
 
-更新客户端令牌：把新令牌写进 `/opt/mcp-foundry/clients/langgraph/.env` 的
+更新客户端令牌：把 rep 令牌写进 `/opt/mcp-foundry/clients/langgraph/.env` 的
 `FOUNDRY_MCP_TOKEN`，`docker compose up -d --force-recreate`（restart 不重载 .env）。
-端到端验收：`https://crm.yiongspace.com` 问「我的商机有哪些」出真 Twenty 数据，
-跨域问工资零泄漏、越权查同事商机被 row_denied。
+**审批人令牌不放前端**：共享公网页面不配 `FOUNDRY_MCP_APPROVER_TOKEN`（否则任何访客
+可自批高危写——见职责分离纪律）；审批只走飞书那条独立认证的路。
+端到端验收：`https://crm.yiongspace.com` 以 rep 身份问「我名下有哪些客户」只见自己的 3 家、
+跨域问工资零泄漏、越权查同事商机被 row_denied、退款超额被挂起等飞书批复。
 
 **轮换/换密钥**：再跑 keygen 换新 kid → 把新 JWK 追加进 `/opt/foundry-keys/jwks.json`
 的 keys（新旧并存过渡，Foundry 按 URL 轮询热更新，≤ 刷新间隔生效）→ 用新私钥重签令牌、

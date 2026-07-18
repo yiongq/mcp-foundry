@@ -169,4 +169,24 @@ describe('审批闸门 HTTP 全链路', () => {
     const anonymous = await fetch(`${baseUrl}/approvals`);
     expect(anonymous.status).toBe(401);
   });
+
+  it('职责分离：审批人不能批自己发起的单（self-approval → 403，且状态不变）', async () => {
+    // 经理 e005 自己发起的一张单（构造场景：既是审批人角色又是发起人）
+    const own = await store.create({
+      system: 'fake-crm',
+      tool: 'delete_contact',
+      args: { id: 'c-self' },
+      argsHash: 'hself',
+      userId: 'e005',
+      role: 'sales_manager',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const selfDecide = await fetch(`${baseUrl}/approvals/${own.id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...MANAGER_HEADERS }, // e005 批 e005 的单
+      body: JSON.stringify({ decision: 'approve' }),
+    });
+    expect(selfDecide.status).toBe(403);
+    expect((await store.get(own.id))?.status).toBe('pending'); // 硬校验拦在 decide 之前
+  });
 });

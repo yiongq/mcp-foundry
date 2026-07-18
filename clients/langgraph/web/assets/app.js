@@ -110,6 +110,7 @@ async function ask(text) {
     send.disabled = false;
   };
 
+  let hadError = false;
   try {
     const resp = await fetch("/api/chat", {
       method: "POST",
@@ -133,17 +134,37 @@ async function ask(text) {
         const line = frame.split(/\r?\n/).find((l) => l.startsWith("data:"));
         if (!line) continue;
         const evt = JSON.parse(line.slice(5).trim());
-        handleEvent(evt, { bubble, cursor, toolsBox, toolRows, addAnswer: (t) => (answer += t) });
+        handleEvent(evt, {
+          bubble,
+          cursor,
+          toolsBox,
+          toolRows,
+          addAnswer: (t) => (answer += t),
+          markError: () => (hadError = true),
+        });
       }
     }
-    // 流结束：整段答案按 markdown 渲染（表格/加粗/代码），比逐字 pre-wrap 好看
     cursor.remove();
-    if (answer) bubble.innerHTML = renderMarkdown(answer);
+    // 出错时：不要用半截答案覆盖掉错误信息（否则 demo 会把"出错"显示成"已完成"）
+    if (hadError) {
+      appendInterrupted(bubble, answer);
+    } else if (answer) {
+      bubble.innerHTML = renderMarkdown(answer); // 正常结束：整段 markdown 渲染
+    }
   } catch {
-    if (!answer) bubble.textContent = "服务暂时开小差了，请稍后再试。";
+    // 网络中断/流失败：残答不能冒充成功，明确标"被中断"
+    cursor.remove();
+    appendInterrupted(bubble, answer);
   } finally {
     finish();
   }
+}
+
+// 中断态：有残答就渲染出来但标明未完成，无残答就纯提示——都带红色"被中断"条
+function appendInterrupted(bubble, answer) {
+  bubble.innerHTML = answer ? renderMarkdown(answer) : "";
+  const note = el("div", "stream-error", "⚠ 回答被中断，请重试");
+  bubble.appendChild(note);
 }
 
 // 找最早一个仍在「执行中」且同名的行——匹配 start/end，兼容同名工具多次调用
@@ -184,6 +205,7 @@ function handleEvent(evt, ctx) {
   } else if (evt.type === "error") {
     ctx.cursor.remove();
     ctx.bubble.textContent = evt.message;
+    ctx.markError(); // 标记出错，流末不要用半截答案覆盖
   }
 }
 
