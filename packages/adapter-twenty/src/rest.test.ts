@@ -148,8 +148,20 @@ describe('TwentyRestBackend 字段映射', () => {
         json: {
           data: {
             opportunities: [
-              { id: 'o1', name: 'A', stage: 'PROPOSAL', amount: { amountMicros: '480000000000' }, ownerId: 'e007' },
-              { id: 'o2', name: 'B', stage: 'CUSTOMER', amount: { amountMicros: '150000000000' }, ownerId: 'e008' },
+              {
+                id: 'o1',
+                name: 'A',
+                stage: 'PROPOSAL',
+                amount: { amountMicros: '480000000000' },
+                ownerId: 'e007',
+              },
+              {
+                id: 'o2',
+                name: 'B',
+                stage: 'CUSTOMER',
+                amount: { amountMicros: '150000000000' },
+                ownerId: 'e008',
+              },
             ],
           },
         },
