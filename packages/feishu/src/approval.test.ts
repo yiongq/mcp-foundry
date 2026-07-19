@@ -2,7 +2,12 @@ import type { ApprovalRecord, GuardedResult } from '@yiong/foundry-core';
 import { loadRbacConfig, MemoryApprovalStore } from '@yiong/foundry-core';
 import { describe, expect, it } from 'vitest';
 import type { ApprovalCardDeps } from './approval.js';
-import { buildApprovalCard, handleCardAction, summarizeResult } from './approval.js';
+import {
+  buildApprovalCard,
+  buildDecidedCard,
+  handleCardAction,
+  summarizeResult,
+} from './approval.js';
 
 const rbacCrm = loadRbacConfig(`
 roles:
@@ -87,6 +92,24 @@ describe('审批卡片', () => {
     expect(actions).toHaveLength(2);
     expect(actions?.[0]?.value).toEqual({ approvalId: record.id, decision: 'approve' });
     expect(actions?.[1]?.value).toEqual({ approvalId: record.id, decision: 'deny' });
+  });
+
+  it('待批卡带命中规则 + why 说明 + 审计脚注（设计稿的信息架构，schema 内还原）', async () => {
+    const store = new MemoryApprovalStore();
+    const record = await seedRecord(store);
+    const json = JSON.stringify(buildApprovalCard(record));
+    expect(json).toContain('命中规则');
+    expect(json).toContain(`${record.tool} · high-risk write`);
+    expect(json).toContain('无 data'); // adapter.execute 之前挂起、不夹带业务数据
+    expect(json).toContain('全程审计'); // 底部审计脚注
+    expect(json).toContain('发起人不能自批');
+  });
+
+  it('已决卡按结果给脚注：批准=已消票 / 拒绝=不执行', async () => {
+    const store = new MemoryApprovalStore();
+    const record = await seedRecord(store);
+    expect(JSON.stringify(buildDecidedCard(record, 'approved', 'x'))).toContain('consumed');
+    expect(JSON.stringify(buildDecidedCard(record, 'denied', 'x'))).toContain('操作不会执行');
   });
 
   it('经理点同意：批复落库 → 卡片翻绿 → 以发起人身份续跑 → 原会话收到 ✅', async () => {
