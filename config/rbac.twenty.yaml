@@ -35,3 +35,18 @@ roles:
   sales_manager:
     tools: "*"
     approver: true
+  # 只读经理：给公开演示页的「切换身份」用。工具面比销售宽（多 get_pipeline_summary、
+  # 无 owner_id 行级过滤 → 跨销售可见、无 phone 脱敏），但**不含任何写工具、非 approver**——
+  # 任何访客切到此身份也无法改数据/自批，不违背「发起人无法自批」与 DEPLOY-CHECKLIST
+  # 「审批人令牌不放前端」。这演示的是「同一网关、身份变宽 → 读的面变宽」，不放开写。
+  sales_manager_ro:
+    tools:
+      [
+        list_accounts,
+        get_account,
+        list_contacts,
+        get_contact,
+        list_opportunities,
+        get_opportunity,
+        get_pipeline_summary,
+      ]

@@ -3,6 +3,10 @@
 对话走 LangGraph react agent 的 astream_events，映射成前端好消费的事件流：
 token 增量、工具开始/结束、pending 审批态、完成。审批闸门的 pending 不当普通
 工具输出，单独发一条 pending 事件，让前端就地弹审批卡片。
+
+多身份：每枚演示身份（rep / 可选 manager）各自连网关、各自把网关按身份收窄后的工具面
+装成一个 agent。/api/chat 按请求里的 identity 选用对应 agent——工具面/行级/脱敏的差异
+全是网关给的真实结果，不是前端演的。thread_id 按身份加前缀，切身份即换一段对话。
 """
 
 from __future__ import annotations
@@ -21,51 +25,66 @@ from sse_starlette.sse import EventSourceResponse
 
 from .agent import build_agent, build_chat_model
 from .approvals import ApprovalsProxy
-from .config import AppConfig, load_config
+from .config import AppConfig, GatewayConfig, load_config
 from .gateway import as_pending, load_gateway_tools, parse_guarded_result
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 
+class IdentityRuntime:
+    """一枚演示身份的运行态：网关配置元信息、按该身份收窄的工具表、绑定这套工具的 agent。
+    agent 可能为 None（缺 LLM 凭据）——此时页面/身份信息/工具面仍可用，只有对话返回明确提示。"""
+
+    def __init__(self, meta: GatewayConfig, agent: Any, tools: dict[str, Any]) -> None:
+        self.meta = meta
+        self.agent = agent
+        self.tools = tools
+
+
 class Runtime:
-    """进程级共享：编译好的 agent、审批代理、工具表、配置。启动时装配一次。
-    agent 可能为 None（缺 LLM 凭据）——此时页面/审批仍可用，只有对话返回明确提示。
-    tools 按名保留：批准后由客户端以发起人身份直接重发那一次调用，确定地消票执行——
-    不走 LLM 重发（线程有记忆时 LLM 会以为已提交、不再调工具，票永远消费不掉）。"""
+    """进程级共享：每身份一个 IdentityRuntime + 审批代理 + 配置。启动时装配一次。"""
 
     def __init__(
         self,
         config: AppConfig,
-        agent: Any,
+        identities: dict[str, IdentityRuntime],
         approvals: ApprovalsProxy,
-        tools: dict[str, Any],
     ) -> None:
         self.config = config
-        self.agent = agent
+        self.identities = identities
         self.approvals = approvals
-        self.tools = tools
+
+    def identity(self, key: str) -> IdentityRuntime:
+        """按 key 取身份运行态；未知 key 回退到默认身份（绝不 KeyError）。"""
+        return self.identities.get(key) or self.identities[self.config.default_identity]
 
 
 async def build_runtime(config: AppConfig) -> Runtime:
-    tool_list = await load_gateway_tools(config.gateway)
-    tools = {t.name: t for t in tool_list}
-    # 缺 LLM 凭据不拦服务启动：静态页、身份信息、审批代理都不依赖 LLM，
-    # 只有对话循环需要。缺 key 时 agent=None，/api/chat 回一句明确提示。
+    # 缺 LLM 凭据不拦服务启动：静态页、身份信息、工具面、审批代理都不依赖 LLM，
+    # 只有对话循环需要。缺 key 时各 agent=None，/api/chat 回一句明确提示。
+    model = None
     try:
         model = build_chat_model(config.llm)
-        # 进程内 checkpointer：同一 thread_id 的多轮对话在本进程内有记忆（重启即清）
-        agent = build_agent(model, tool_list, checkpointer=MemorySaver())
     except RuntimeError as exc:
         print(f"[langgraph] 对话未启用：{exc}")
-        agent = None
-    return Runtime(config, agent, ApprovalsProxy(config.approver), tools)
+
+    identities: dict[str, IdentityRuntime] = {}
+    for key, gw in config.identities.items():
+        tool_list = await load_gateway_tools(gw)
+        tools = {t.name: t for t in tool_list}
+        # 进程内 checkpointer：同一 thread_id 的多轮对话在本进程内有记忆（重启即清）。
+        # 每身份各一个 agent+checkpointer，身份间记忆不串。
+        agent = build_agent(model, tool_list, checkpointer=MemorySaver()) if model else None
+        identities[key] = IdentityRuntime(gw, agent, tools)
+        print(f"[langgraph] 身份 {key}：{gw.identity_label} → {len(tools)} 个工具")
+
+    return Runtime(config, identities, ApprovalsProxy(config.approver))
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     config = load_config()
     app.state.runtime = await build_runtime(config)
-    print(f"[langgraph] 网关身份：{config.gateway.identity_label} → {config.gateway.url}")
     can_approve = "可用" if config.approver.enabled else "不可用"
     print(f"[langgraph] 审批人：{config.approver.label}（就地批复{can_approve}）")
     yield
@@ -75,12 +94,12 @@ def _sse(payload: dict[str, Any]) -> dict[str, str]:
     return {"data": json.dumps(payload, ensure_ascii=False)}
 
 
-async def _execute_approved(runtime: Runtime, record: dict[str, Any]) -> dict[str, Any]:
+async def _execute_approved(idr: IdentityRuntime, record: dict[str, Any]) -> dict[str, Any]:
     """批准后续跑：按单据的 tool+args 以发起人身份重发。网关命中已批准单 → 消费执行。
     返回 {kind, ...} 供前端如实展示；工具缺失/异常都归一成结构化结果，不抛。"""
     tool_name = record.get("tool")
     args = record.get("args") or {}
-    tool = runtime.tools.get(tool_name)
+    tool = idr.tools.get(tool_name)
     if tool is None:
         return {"kind": "error", "message": f"工具 {tool_name} 不在当前身份的工具面内"}
     try:
@@ -92,13 +111,11 @@ async def _execute_approved(runtime: Runtime, record: dict[str, Any]) -> dict[st
     return result if result is not None else {"kind": "ok"}
 
 
-async def _chat_events(
-    runtime: Runtime, message: str, thread_id: str
-) -> AsyncIterator[dict[str, str]]:
+async def _chat_events(agent: Any, message: str, thread_id: str) -> AsyncIterator[dict[str, str]]:
     config = {"configurable": {"thread_id": thread_id}}
     inputs = {"messages": [{"role": "user", "content": message}]}
     try:
-        async for event in runtime.agent.astream_events(inputs, config=config, version="v2"):
+        async for event in agent.astream_events(inputs, config=config, version="v2"):
             kind = event.get("event")
             if kind == "on_chat_model_stream":
                 chunk = event["data"].get("chunk")
@@ -138,9 +155,22 @@ def create_app() -> FastAPI:
     @app.get("/api/config")
     async def api_config() -> JSONResponse:
         rt: Runtime = app.state.runtime
+        identities = [
+            {
+                "key": key,
+                "name": idr.meta.name,
+                "role": idr.meta.role,
+                "userId": idr.meta.user_id,
+                "tokenAlg": idr.meta.token_alg,
+                "domain": "CRM · Twenty",
+                "tools": list(idr.tools.keys()),
+            }
+            for key, idr in rt.identities.items()
+        ]
         return JSONResponse(
             {
-                "identity": rt.config.gateway.identity_label,
+                "identities": identities,
+                "current": rt.config.default_identity,
                 "model": rt.config.llm.model,
                 "approverEnabled": rt.approvals.enabled,
             }
@@ -151,10 +181,12 @@ def create_app() -> FastAPI:
         body = await request.json()
         message = str(body.get("message", "")).strip()
         thread_id = str(body.get("threadId") or "default")
+        identity_key = str(body.get("identity") or app.state.runtime.config.default_identity)
         rt: Runtime = app.state.runtime
         if not message:
             return EventSourceResponse(iter([_sse({"type": "error", "message": "消息为空"})]))
-        if rt.agent is None:
+        idr = rt.identity(identity_key)
+        if idr.agent is None:
             return EventSourceResponse(
                 iter(
                     [
@@ -167,7 +199,8 @@ def create_app() -> FastAPI:
                     ]
                 )
             )
-        return EventSourceResponse(_chat_events(rt, message, thread_id))
+        # thread_id 按身份加前缀：切身份即换一段对话，记忆不串
+        return EventSourceResponse(_chat_events(idr.agent, message, f"{identity_key}:{thread_id}"))
 
     @app.get("/api/pending")
     async def api_pending() -> JSONResponse:
@@ -192,7 +225,8 @@ def create_app() -> FastAPI:
             return JSONResponse(result, status_code=status)
         # 批准成功 → 立即以发起人身份重发这次调用，网关命中已批准单消费执行。
         # 直接按单据里的 tool+args 重发（而非让 LLM 重发）——确定消票，不受对话记忆干扰。
-        execution = await _execute_approved(rt, result)
+        # 发起人即默认身份（只读经理不能发起写，故审批续跑一律走默认销售身份的工具表）。
+        execution = await _execute_approved(rt.identity(rt.config.default_identity), result)
         return JSONResponse({"approval": result, "execution": execution}, status_code=200)
 
     @app.get("/")

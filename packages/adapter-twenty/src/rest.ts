@@ -13,6 +13,7 @@ import type {
   TwentyBackend,
   UpdateContactPatch,
 } from './backend.js';
+import { canonicalStageToTwenty, twentyStageToCanonical } from './stage.js';
 
 /**
  * Twenty CRM REST 后端（Core API：/rest/ + Authorization: Bearer <API_KEY>）。
@@ -231,7 +232,7 @@ export class TwentyRestBackend implements TwentyBackend {
       opportunity_id: o.id,
       name: o.name ?? '',
       account_id: o.companyId ?? '',
-      stage: o.stage ?? '',
+      stage: twentyStageToCanonical(o.stage),
       // Twenty 金额是 amountMicros（百万分之一），可能是字符串，先归一成数再换算回元
       amount: o.amount?.amountMicros != null ? Number(o.amount.amountMicros) / 1_000_000 : 0,
       currency: 'CNY',
@@ -375,7 +376,7 @@ export class TwentyRestBackend implements TwentyBackend {
     const body = await this.request(
       'PATCH',
       `/opportunities/${encodeURIComponent(opportunityId)}`,
-      { stage },
+      { stage: canonicalStageToTwenty(stage) },
     );
     const one = this.unwrapOne(body, 'updateOpportunity', 'opportunity');
     return one === null ? null : this.toOpportunityRow(one);

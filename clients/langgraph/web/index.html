@@ -1,9 +1,20 @@
 <!doctype html>
-<html lang="zh" data-accent="sage">
+<html lang="zh-Hans" data-accent="sage">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Foundry · Guarded MCP Gateway（CRM 实时演示）</title>
+    <title>Foundry · 销售数据助手（Guarded MCP Gateway 演示）</title>
+    <meta
+      name="description"
+      content="Foundry Guarded MCP Gateway 实时演示：用一句话查改 CRM，守卫在网关层按身份收窄工具面、行级过滤、字段脱敏，高危写须独立审批人批复。"
+    />
+    <meta property="og:title" content="Foundry · 销售数据助手（Guarded MCP Gateway 演示）" />
+    <meta
+      property="og:description"
+      content="同一网关、不同身份、行为不同——读按身份收窄，改/删/退款须独立审批人批复，发起人无法自批。"
+    />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#6e8c6a" />
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236e8c6a'/%3E%3Cpath d='M16 6 L25 9.5 V16 C25 21.5 21 25.5 16 27 C11 25.5 7 21.5 7 16 V9.5 Z' fill='none' stroke='%23fff' stroke-width='2'/%3E%3Cpath d='M12 16 L15 19 L20.5 12.5' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
@@ -13,6 +24,7 @@
         var tp=null;try{tp=localStorage.getItem('foundry-theme');}catch(e){}
         var dark = tp ? tp==='dark' : matchMedia('(prefers-color-scheme: dark)').matches;
         var w=document.createElement('div');w.id='ae-loader';
+        w.setAttribute('role','progressbar');w.setAttribute('aria-label','加载中');w.setAttribute('aria-busy','true');
         w.style.cssText='position:fixed;inset:0;z-index:9999;background:'+(dark?'#1f1e1b':'#faf9f5')+';display:flex;align-items:center;justify-content:center;transition:opacity 360ms ease';
         var t=document.createElement('div');t.style.cssText='position:relative;width:120px;height:2px;border-radius:2px;background:'+(dark?'rgba(255,255,255,.08)':'rgba(26,24,23,.08)')+';overflow:hidden';
         var col=dark?'rgba(255,255,255,.85)':'#6e8c6a';
@@ -26,6 +38,7 @@
       })();
     </script>
     <style>
+      /* 自托管字体（不引外部 CDN——公开页避免第三方请求 / CSP / 离线失效） */
       @font-face { font-family: "Geist"; src: url("/assets/fonts/Geist-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
       @font-face { font-family: "Geist"; src: url("/assets/fonts/Geist-Medium.woff2") format("woff2"); font-weight: 500; font-display: swap; }
       @font-face { font-family: "Geist"; src: url("/assets/fonts/Geist-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
@@ -36,7 +49,7 @@
         --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
         --bg-base: #faf9f5; --bg-panel: #fdfcf8; --bg-elev: #f0eee6; --bg-sunken: #e9e6dc;
         --border: #e4e0d5; --border-strong: #d0cbbd; --border-subtle: #efece3;
-        --fg: #262420; --fg-strong: #161512; --fg-muted: #6e6a60; --fg-faint: #8a857a; --fg-on-accent: #fff;
+        --fg: #262420; --fg-strong: #161512; --fg-muted: #6e6a60; --fg-faint: #6e6a60; --fg-on-accent: #fff;
         --success: #58745f; --success-soft: #e7ede6; --warning: #84601f; --warning-soft: #f4ecda; --warning-border: #e0d3ac; --danger: #ab4439; --danger-soft: #f6e7e4;
         --accent: #6e8c6a; --accent-hover: #5c7a58; --accent-soft: #e8eee4; --accent-soft-border: #c6d4c0; --accent-text: #46603f;
         --shadow-sm: 0 1px 2px rgba(26,24,23,.05), 0 1px 1px rgba(26,24,23,.03);
@@ -79,10 +92,11 @@
       @keyframes cardIn { from { opacity: 0; transform: translateY(10px) scale(.99); } to { opacity: 1; transform: none; } }
       @keyframes aeLoad1 { 0% { left: -35%; right: 100%; } 60% { left: 100%; right: -90%; } 100% { left: 100%; right: -90%; } }
       @keyframes aeLoad2 { 0% { left: -200%; right: 100%; } 60% { left: 107%; right: -8%; } 100% { left: 107%; right: -8%; } }
-      @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } main { scroll-behavior: auto !important; } }
 
       /* ---------- shell ---------- */
       .shell { display: grid; grid-template-columns: var(--rail-w) 1fr; height: 100dvh; }
+      .rail-backdrop { display: none; }
 
       /* ---------- guard rail ---------- */
       .rail { border-right: 1px solid var(--border-subtle); background: var(--bg-panel); display: flex; flex-direction: column; min-height: 0; }
@@ -92,17 +106,17 @@
       .rail-head .t { line-height: 1.2; }
       .rail-head .t b { color: var(--fg-strong); font-weight: 600; font-size: 14.5px; letter-spacing: -.01em; }
       .rail-head .t span { display: block; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-faint); margin-top: 2px; }
+      .rail-close { display: none; margin-left: auto; border: 1px solid var(--border); background: var(--bg-base); border-radius: 7px; width: 30px; height: 30px; color: var(--fg-muted); cursor: pointer; font-size: 16px; }
       .rail-body { flex: 1; overflow-y: auto; padding: 16px 16px 20px; display: flex; flex-direction: column; gap: 18px; }
       .rail-foot { border-top: 1px solid var(--border-subtle); padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
-      .rail-foot a { font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-muted); text-decoration: none; }
-      .rail-foot a:hover { color: var(--accent-text); }
 
       .sect .lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-faint); margin-bottom: 9px; display: flex; align-items: center; gap: 7px; }
       .idcard { border: 1px solid var(--border); border-radius: 11px; background: var(--bg-base); padding: 13px 14px; }
       .idcard .name { font-weight: 600; color: var(--fg-strong); font-size: 15px; display: flex; align-items: center; gap: 8px; }
       .idcard .role { font-family: var(--font-mono); font-size: 11px; color: var(--accent-text); background: var(--accent-soft); border: 1px solid var(--accent-soft-border); border-radius: 5px; padding: 1px 6px; }
-      .idcard .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--fg-muted); margin-top: 9px; }
+      .idcard .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--fg-muted); margin-top: 9px; gap: 10px; }
       .idcard .row .k { font-family: var(--font-mono); color: var(--fg-faint); }
+      .idcard .row .v { overflow-wrap: anywhere; text-align: right; }
 
       .tool-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-family: var(--font-mono); font-size: 12px; color: var(--fg); }
       .tool-item .d { width: 6px; height: 6px; border-radius: 2px; flex: none; background: var(--accent); }
@@ -123,11 +137,22 @@
       @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--success) 50%, transparent); } 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
       .audit b { color: var(--fg); font-weight: 600; }
 
+      /* ---------- 身份段控（演示切换） ---------- */
+      .demo-tweak { border-top: 1px solid var(--border-subtle); padding: 12px 16px 4px; display: flex; flex-direction: column; gap: 8px; }
+      .demo-tweak .dt-lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-faint); display: flex; align-items: center; gap: 6px; }
+      .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-base); width: 100%; }
+      .seg button { flex: 1; border: 0; background: transparent; color: var(--fg-muted); font-family: var(--font-mono); font-size: 11.5px; padding: 6px 8px; cursor: pointer; transition: all 140ms var(--ease); white-space: nowrap; }
+      .seg button + button { border-left: 1px solid var(--border); }
+      .seg button:hover { color: var(--fg); }
+      .seg button.on { background: var(--accent-soft); color: var(--accent-text); font-weight: 500; }
+
       /* ---------- conversation column ---------- */
       .col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-      .topbar { border-bottom: 1px solid var(--border-subtle); background: color-mix(in oklab, var(--bg-panel) 85%, transparent); backdrop-filter: blur(8px); padding: 12px 22px; display: flex; align-items: center; gap: 12px; }
-      .topbar .title { font-weight: 600; color: var(--fg-strong); letter-spacing: -.01em; }
-      .topbar .status { margin-left: auto; display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-faint); }
+      .topbar { border-bottom: 1px solid var(--border-subtle); background: color-mix(in oklab, var(--bg-panel) 85%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); padding: 12px 22px; display: flex; align-items: center; gap: 12px; }
+      .hamburger { display: none; border: 1px solid var(--border); background: var(--bg-base); border-radius: 7px; width: 34px; height: 34px; color: var(--fg-muted); cursor: pointer; place-items: center; flex: none; }
+      .hamburger svg { display: block; }
+      .topbar .title { font-weight: 600; color: var(--fg-strong); letter-spacing: -.01em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .topbar .status { margin-left: auto; display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-muted); }
       .topbar .status .chip { padding: 3px 9px; border: 1px solid var(--border); border-radius: 20px; background: var(--bg-base); white-space: nowrap; }
       .icon-btn { border: 1px solid var(--border); background: var(--bg-base); border-radius: 7px; cursor: pointer; color: var(--fg-muted); width: 32px; height: 32px; font-size: 15px; display: grid; place-items: center; }
       .icon-btn:hover { background: var(--bg-elev); color: var(--fg); }
@@ -138,15 +163,18 @@
       .msg { animation: msgIn var(--duration) var(--ease); }
       .msg .who { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-faint); margin-bottom: 6px; }
       .msg.user { display: flex; flex-direction: column; align-items: flex-end; }
-      .msg.user .bubble { background: var(--accent-soft); border: 1px solid var(--accent-soft-border); color: var(--fg-strong); border-radius: 13px 13px 4px 13px; padding: 11px 15px; max-width: 82%; width: fit-content; }
+      .msg.user .bubble { background: var(--accent-soft); border: 1px solid var(--accent-soft-border); color: var(--fg-strong); border-radius: 13px 13px 4px 13px; padding: 11px 15px; max-width: 82%; width: fit-content; overflow-wrap: anywhere; }
       .msg.ai .bubble { color: var(--fg); white-space: pre-wrap; word-break: break-word; }
       .msg.ai .bubble p { margin: 0 0 10px; }
       .msg.ai .bubble p:last-child { margin-bottom: 0; }
       .msg.ai .bubble strong { color: var(--fg-strong); font-weight: 600; }
       .msg.ai .bubble code { font-family: var(--font-mono); font-size: .88em; background: var(--bg-elev); padding: 1px 5px; border-radius: 4px; }
+      .msg.ai .bubble ul { margin: 4px 0 10px; padding-left: 20px; }
+      .msg.ai .bubble li { margin: 2px 0; }
       .tbl-wrap { overflow-x: auto; margin: 4px 0 10px; border: 1px solid var(--border); border-radius: 9px; }
-      .msg.ai .bubble table { border-collapse: collapse; font-size: 13.5px; white-space: normal; width: 100%; }
-      .msg.ai .bubble th, .msg.ai .bubble td { border-bottom: 1px solid var(--border-subtle); border-right: 1px solid var(--border-subtle); padding: 8px 13px; text-align: left; }
+      /* 宽表让 wrapper 横向滚动（而不是把列挤成一团）；窄表仍撑满 */
+      .msg.ai .bubble table { border-collapse: collapse; font-size: 13.5px; white-space: normal; width: auto; min-width: 100%; }
+      .msg.ai .bubble th, .msg.ai .bubble td { border-bottom: 1px solid var(--border-subtle); border-right: 1px solid var(--border-subtle); padding: 8px 13px; text-align: left; white-space: nowrap; }
       .msg.ai .bubble tr:last-child td { border-bottom: 0; }
       .msg.ai .bubble th:last-child, .msg.ai .bubble td:last-child { border-right: 0; }
       .msg.ai .bubble th { background: var(--bg-elev); color: var(--fg-strong); font-weight: 600; font-family: var(--font-mono); font-size: 12px; }
@@ -169,13 +197,13 @@
       .approval .head { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--fg-strong); }
       .approval .head .ic { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--warning); background: color-mix(in oklab, var(--warning) 14%, transparent); border: 1px solid var(--warning-border); transition: all 200ms var(--ease); }
       .approval .head .ic svg { display: block; }
-      .approval .head .htxt { white-space: nowrap; font-size: 14.5px; letter-spacing: -.01em; }
-      .approval .head .badge { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 10.5px; color: var(--warning); background: color-mix(in oklab, var(--warning) 10%, transparent); border: 1px solid var(--warning-border); border-radius: 20px; padding: 2px 9px 2px 8px; margin-left: auto; }
+      .approval .head .htxt { font-size: 14.5px; letter-spacing: -.01em; min-width: 0; }
+      .approval .head .badge { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 10.5px; color: var(--warning); background: color-mix(in oklab, var(--warning) 10%, transparent); border: 1px solid var(--warning-border); border-radius: 20px; padding: 2px 9px 2px 8px; margin-left: auto; flex: none; white-space: nowrap; }
       .approval .head .badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--warning); animation: blink 1.6s infinite; }
       .approval .meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-muted); margin: 11px 0 4px; }
       .approval .meta .k { color: var(--fg-faint); }
       .approval .why { font-size: 12.5px; color: var(--fg-muted); line-height: 1.6; margin: 8px 0 13px; padding-left: 11px; border-left: 2px solid var(--warning-border); }
-      .approval .actions { display: flex; gap: 9px; align-items: center; }
+      .approval .actions { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
       .approval .actor { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-faint); }
       .approval.decided { background: var(--bg-panel); border-color: var(--border); box-shadow: var(--shadow-sm); }
       .approval.approved .head .htxt { color: var(--success); }
@@ -217,7 +245,8 @@
       footer { border-top: 1px solid var(--border-subtle); background: var(--bg-panel); padding: 14px 22px calc(14px + env(safe-area-inset-bottom)); }
       .composer { max-width: 780px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; background: var(--bg-base); border: 1px solid var(--border-strong); border-radius: 15px; padding: 7px 7px 7px 4px; transition: border-color 140ms var(--ease); }
       .composer:focus-within { border-color: var(--accent-soft-border); box-shadow: 0 0 0 3px var(--accent-soft); }
-      .composer textarea { flex: 1; resize: none; border: 0; background: transparent; color: var(--fg); padding: 9px 12px; font-size: 15px; line-height: 1.5; max-height: 160px; outline: none; }
+      /* 16px：低于此 iOS Safari 聚焦时会自动放大整页且不回弹 */
+      .composer textarea { flex: 1; resize: none; border: 0; background: transparent; color: var(--fg); padding: 9px 12px; font-size: 16px; line-height: 1.5; max-height: 160px; outline: none; }
       .composer textarea::placeholder { color: var(--fg-faint); }
       .send { border: 0; background: var(--accent); color: var(--fg-on-accent); border-radius: 11px; width: 40px; height: 40px; font-size: 18px; cursor: pointer; flex: none; transition: all 140ms var(--ease); }
       .send:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
@@ -225,58 +254,75 @@
       .hint { max-width: 780px; margin: 9px auto 0; font-size: 11px; color: var(--fg-faint); text-align: center; display: flex; align-items: center; justify-content: center; gap: 7px; }
       .hint .lock { color: var(--accent-text); display: inline-flex; align-items: center; }
 
+      /* ---------- 移动端：guard rail 变抽屉（不再整条隐藏——它是本 demo 的核心叙事） ---------- */
       @media (max-width: 860px) {
         .shell { grid-template-columns: 1fr; }
-        .rail { display: none; }
+        .hamburger { display: grid; }
+        .topbar .status { display: none; }
+        .rail {
+          position: fixed; top: 0; bottom: 0; left: 0; width: min(88vw, var(--rail-w));
+          z-index: 60; transform: translateX(-100%); transition: transform 240ms var(--ease);
+          box-shadow: var(--shadow-lg); border-right: 1px solid var(--border);
+        }
+        .rail.open { transform: none; }
+        .rail-close { display: grid; place-items: center; }
+        .rail-backdrop { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,.42); opacity: 0; pointer-events: none; transition: opacity 240ms var(--ease); }
+        .rail-backdrop.on { opacity: 1; pointer-events: auto; }
       }
     </style>
   </head>
   <body>
+    <div class="rail-backdrop" id="rail-backdrop" hidden></div>
     <div class="shell" id="shell">
       <!-- ===================== GUARD RAIL ===================== -->
       <aside class="rail" id="rail">
         <div class="rail-head">
-          <span class="logo"><svg width="17" height="17" viewBox="0 0 32 32" fill="none"><path d="M16 3 L27 7.5 V15 C27 22 22 27 16 28.5 C10 27 5 22 5 15 V7.5 Z" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"></path><path d="M11 16 L14.5 19.5 L21 12" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+          <span class="logo"><svg width="17" height="17" viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false"><path d="M16 3 L27 7.5 V15 C27 22 22 27 16 28.5 C10 27 5 22 5 15 V7.5 Z" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"></path><path d="M11 16 L14.5 19.5 L21 12" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
           <div class="t"><b>Foundry</b><span>Guarded MCP Gateway</span></div>
+          <button class="rail-close" id="rail-close" aria-label="关闭侧栏">✕</button>
         </div>
         <div class="rail-body">
           <div class="sect">
-            <div class="lbl">当前身份</div>
+            <h2 class="lbl">当前身份</h2>
             <div class="idcard">
               <div class="name"><span id="id-name">…</span><span class="role" id="id-role">…</span></div>
-              <div class="row"><span class="k">domain</span><span id="id-domain">CRM · Twenty</span></div>
-              <div class="row"><span class="k">token</span><span id="id-token">ES256 · JWKS</span></div>
+              <div class="row"><span class="k">domain</span><span class="v" id="id-domain">CRM · Twenty</span></div>
+              <div class="row"><span class="k">token</span><span class="v" id="id-token">…</span></div>
             </div>
           </div>
 
           <div class="sect">
-            <div class="lbl">可见工具面 · tools/list</div>
+            <h2 class="lbl">可见工具面 · tools/list</h2>
             <div id="tool-surface"></div>
             <div class="tool-note">工具面在 LLM 看到之前就按身份收窄——不该用的工具连 <code style="font-family:var(--font-mono);font-size:11px">tools/list</code> 都不出现,而非调用被拒后再解释。</div>
           </div>
 
           <div class="sect">
-            <div class="lbl">出口生效规则</div>
-            <div class="rule"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"></path></svg></span><span><b>行级过滤</b> · 只见 <code>owner_id == 自己</code> 名下的客户/联系人/商机</span></div>
-            <div class="rule"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6.5 10-6.5c1.6 0 3 .4 4.2 1"></path><path d="M22 12s-1.2 2.2-3.3 3.9"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path><path d="M3 3l18 18"></path></svg></span><span><b>字段脱敏</b> · 联系人 <code>phone</code> 出口整字段剔除(不返回),邮箱不脱敏</span></div>
-            <div class="rule"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4-3 6.8-7 8-4-1.2-7-4-7-8V6z"></path><path d="M9 12l2.2 2.2L15 10"></path></svg></span><span><b>写前归属校验</b> · 越权改删他人的行,审批前就 <code>row_denied</code></span></div>
+            <h2 class="lbl">出口生效规则</h2>
+            <div class="rule"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 5h18l-7 8v6l-4-2v-4z"></path></svg></span><span><b>行级过滤</b> · 销售只见 <code>owner_id == 自己</code> 名下的客户/联系人/商机;经理跨销售可见</span></div>
+            <div class="rule"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.5-6.5 10-6.5c1.6 0 3 .4 4.2 1"></path><path d="M22 12s-1.2 2.2-3.3 3.9"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path><path d="M3 3l18 18"></path></svg></span><span><b>字段脱敏</b> · 销售身份下联系人 <code>phone</code> 出口整列剔除(不返回),邮箱可见;经理不脱敏</span></div>
+            <div class="rule"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3l7 3v5c0 4-3 6.8-7 8-4-1.2-7-4-7-8V6z"></path><path d="M9 12l2.2 2.2L15 10"></path></svg></span><span><b>写前归属校验</b> · 越权改删他人的行,审批前就 <code>row_denied</code></span></div>
           </div>
 
           <div class="sect">
-            <div class="lbl">审计</div>
+            <h2 class="lbl">审计</h2>
             <div class="audit"><span class="pulse"></span><span><b>逐调用留痕</b> · audit/foundry.jsonl,参数只记哈希</span></div>
           </div>
         </div>
+        <div class="demo-tweak" id="id-switch" hidden>
+          <div class="dt-lbl"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h11"></path><path d="M4 17h7"></path><circle cx="18" cy="7" r="2.4"></circle><circle cx="14" cy="17" r="2.4"></circle></svg><span>演示身份 · 切换看守卫如何按角色收窄</span></div>
+          <div class="seg" id="id-seg" role="group" aria-label="切换演示身份"></div>
+        </div>
         <div class="rail-foot">
-          <button class="icon-btn" id="theme" title="切换主题" aria-label="切换主题">◐</button>
-          <a href="https://github.com/yiongq/mcp-foundry" target="_blank" rel="noopener">GitHub ↗</a>
+          <button class="icon-btn" id="theme" title="切换主题" aria-label="切换明暗主题">◐</button>
         </div>
       </aside>
 
       <!-- ===================== CONVERSATION ===================== -->
       <div class="col">
         <div class="topbar">
-          <span class="title">Guarded MCP Gateway <span style="opacity:.55;font-weight:400">· CRM 实时演示</span></span>
+          <button class="hamburger" id="hamburger" aria-label="打开侧栏（身份与守卫规则）" aria-controls="rail" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path></svg></button>
+          <span class="title">销售数据助手</span>
           <div class="status">
             <span class="chip" id="chip-identity">身份 …</span>
             <span class="chip" id="chip-model">模型 …</span>
@@ -285,39 +331,39 @@
 
         <main id="main">
           <div class="empty" id="empty">
-            <div class="kicker">Guarded MCP Gateway · 协议层守卫 · 与 agent 框架无关</div>
-            <h1>用一句话查改 CRM,守卫在网关层把关</h1>
-            <p><strong>这是 Guarded MCP Gateway 的实时演示——CRM 只是它守卫的一个业务系统(同一套守卫也管 HR 域)。</strong>读操作按身份收窄工具面、行级过滤、字段脱敏;改/删/退款这类高危写会被网关闸门挂起,须由<strong>独立审批人</strong>(走飞书批复)通过才执行——<strong>发起人无法自批</strong>。</p>
+            <div class="kicker">同一网关 · 按你的身份收窄 · 高危写须人工审批</div>
+            <h1>用一句话查改你的 CRM</h1>
+            <p>读操作按身份收窄工具面、行级过滤、字段脱敏;改/删/退款这类高危写会被网关闸门挂起,须由<strong>独立审批人</strong>(走飞书批复)通过才执行——<strong>发起人无法自批</strong>。</p>
 
             <div class="prompt-group">
               <div class="gl"><span>查询 · 直接返回</span><span class="ln"></span></div>
               <div class="prompts" id="prompts-read">
-                <button data-q="哪些客户在苏州？各自的联系人是谁"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-3.5-3.5"></path></svg></span><span>哪些客户在苏州?联系人是谁</span></button>
-                <button data-q="华胜精密制造的商机金额和阶段"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"></path><path d="M7 20v-5"></path><path d="M12 20V8"></path><path d="M17 20v-9"></path></svg></span><span>华胜的商机金额和阶段</span></button>
-                <button data-q="给我看联系人陈建国的电话和邮箱"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"></circle><path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5"></path></svg></span><span>陈建国的电话和邮箱(看脱敏)</span></button>
-                <button data-q="我名下这个季度的商机盘点"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1"></rect><rect x="13.5" y="3.5" width="7" height="7" rx="1"></rect><rect x="3.5" y="13.5" width="7" height="7" rx="1"></rect><rect x="13.5" y="13.5" width="7" height="7" rx="1"></rect></svg></span><span>我名下这个季度的商机盘点</span></button>
+                <button data-q="哪些客户在苏州？各自的联系人是谁"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-3.5-3.5"></path></svg></span><span>哪些客户在苏州?联系人是谁</span></button>
+                <button data-q="华胜精密制造的商机金额和阶段"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 20h16"></path><path d="M7 20v-5"></path><path d="M12 20V8"></path><path d="M17 20v-9"></path></svg></span><span>华胜的商机金额和阶段</span></button>
+                <button data-q="给我看联系人陈建国的电话和邮箱"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="3.5"></circle><path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5"></path></svg></span><span>陈建国的电话和邮箱(看字段过滤)</span></button>
+                <button data-q="我名下这个季度的商机盘点"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="7" height="7" rx="1"></rect><rect x="13.5" y="3.5" width="7" height="7" rx="1"></rect><rect x="3.5" y="13.5" width="7" height="7" rx="1"></rect><rect x="13.5" y="13.5" width="7" height="7" rx="1"></rect></svg></span><span>我名下这个季度的商机盘点</span></button>
               </div>
             </div>
 
             <div class="prompt-group">
               <div class="gl"><span>高危写 · 触发审批闸门</span><span class="ln"></span></div>
               <div class="prompts gated" id="prompts-write">
-                <button data-q="把陈建国的职务改成采购副总裁"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18 10l-4-4L4 16z"></path><path d="M13.5 6.5l4 4"></path></svg></span><span>把陈建国的职务改成采购副总裁</span></button>
-                <button data-q="删除刘敏这个联系人"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="M6 7l1 13h10l1-13"></path></svg></span><span>删除刘敏这个联系人</span></button>
-                <button data-q="给华胜订单 ord-1001 退款 ¥1200,客户邮箱 chenjianguo@huasheng.example.com,卡尾号 4321"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M14.5 9H10a2.5 2.5 0 0 0 0 5h1"></path><path d="M11.5 6.5L9 9l2.5 2.5"></path></svg></span><span>给订单退款 ¥1200(超额 · 需批)</span></button>
-                <button data-q="删掉周涛这个联系人"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg></span><span>删掉周涛(他不归我 · 越权)</span></button>
+                <button data-q="把陈建国的职务改成采购副总裁"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 20h4L18 10l-4-4L4 16z"></path><path d="M13.5 6.5l4 4"></path></svg></span><span>把陈建国的职务改成采购副总裁</span></button>
+                <button data-q="删除刘敏这个联系人"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="M6 7l1 13h10l1-13"></path></svg></span><span>删除刘敏这个联系人</span></button>
+                <button data-q="给华胜订单 ord-1001 退款 ¥1200，客户邮箱 chenjianguo@huasheng.example.com，卡尾号 4321"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"></circle><path d="M14.5 9H10a2.5 2.5 0 0 0 0 5h1"></path><path d="M11.5 6.5L9 9l2.5 2.5"></path></svg></span><span>给订单退款 ¥1200(超额 · 需批)</span></button>
+                <button data-q="删掉周涛这个联系人"><span class="pic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg></span><span>删掉周涛(他不归我 · 越权)</span></button>
               </div>
             </div>
           </div>
-          <div class="thread" id="thread" hidden></div>
+          <div class="thread" id="thread" role="log" aria-live="polite" aria-relevant="additions text" aria-label="对话" tabindex="-1" hidden></div>
         </main>
 
         <footer>
           <form class="composer" id="composer">
-            <textarea id="input" rows="1" placeholder="问点什么，或让我改改数据…" autocomplete="off"></textarea>
+            <textarea id="input" rows="1" placeholder="问点什么，或让我改改数据…" autocomplete="off" aria-label="输入消息"></textarea>
             <button class="send" id="send" type="submit" aria-label="发送">↑</button>
           </form>
-          <div class="hint"><span class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2"></rect><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"></path></svg></span><span id="hint-text">守卫在网关执行 · 本客户端零策略代码</span></div>
+          <div class="hint"><span class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4.5" y="10.5" width="15" height="10" rx="2"></rect><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"></path></svg></span><span id="hint-text">守卫在网关执行 · 本客户端零策略代码</span></div>
         </footer>
       </div>
     </div>

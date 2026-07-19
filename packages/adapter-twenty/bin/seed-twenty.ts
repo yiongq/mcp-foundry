@@ -17,6 +17,7 @@ import {
   FIXTURE_OPPORTUNITIES,
   FIXTURE_ORDERS,
 } from '../src/fixtures.js';
+import { canonicalStageToTwenty } from '../src/stage.js';
 
 const baseUrl = (process.env.TWENTY_API_URL ?? '').replace(/\/+$/, '');
 const apiKey = process.env.TWENTY_API_KEY ?? '';
@@ -79,9 +80,11 @@ async function main(): Promise<void> {
     await create('/opportunities', {
       name: o.name,
       ...(companyId ? { companyId } : {}),
-      ...(o.stage ? { stage: o.stage } : {}),
+      // 规范 stage → Twenty 枚举（写规范词会被 Twenty 静默落成 NEW，见 src/stage.ts）
+      ...(o.stage ? { stage: canonicalStageToTwenty(o.stage) } : {}),
       amount: { amountMicros: o.amount * 1_000_000 },
-      ...(o.close_date ? { closeDate: o.close_date } : {}),
+      // Twenty closeDate 是 DATE_TIME，须给完整 ISO（仅给日期会不落库）
+      ...(o.close_date ? { closeDate: `${o.close_date}T00:00:00.000Z` } : {}),
       [ownerField]: o.owner_id,
     });
   }
