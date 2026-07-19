@@ -1,0 +1,31 @@
+# 依赖与基础镜像的自动升级——尤其是安全产品，供应链新鲜度是基本盘。
+# 覆盖：pnpm 工作区、LangGraph 客户端的 pip、GitHub Actions、两个 Dockerfile 的基础镜像。
+version: 2
+updates:
+  - package-ecosystem: npm # pnpm 工作区
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-tooling:
+        patterns: ['@biomejs/*', 'typescript', 'vitest', '@vitest/*', 'tsx', '@types/*']
+
+  - package-ecosystem: pip
+    directory: /clients/langgraph
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker # 摘要固定的基础镜像由 Dependabot 负责升级
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /clients/langgraph
+    schedule:
+      interval: weekly

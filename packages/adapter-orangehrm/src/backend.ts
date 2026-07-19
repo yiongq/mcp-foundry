@@ -1,6 +1,6 @@
 /**
- * 四个工具的统一行结构（fixture 与 REST 两个后端都必须映射到这套形状）。
- * 字段名刻意用 snake_case——与 RBAC 行规则里的 field（如 employee_id）逐字对齐。
+ * 四个工具的统一行结构。字段名刻意用 snake_case——与 RBAC 行规则里的
+ * field（如 employee_id）逐字对齐。
  */
 export interface EmployeeRow {
   employee_id: string;
@@ -30,7 +30,7 @@ export interface SalaryRow {
   effective_date: string;
 }
 
-/** 数据来源抽象：fixture（内置演示数据）与 REST（真实 OrangeHRM）各实现一份。 */
+/** 数据来源抽象：当前仅 fixture（内置演示数据）后端；真实 OrangeHRM REST 后端曾存在，已随死代码清理移除。 */
 export interface OrangeHrmBackend {
   listEmployees(dept?: string): Promise<EmployeeRow[]>;
   getEmployee(employeeId: string): Promise<EmployeeDetail | null>;

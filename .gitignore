@@ -4,6 +4,7 @@ dist/
 .env
 .env.*
 !.env.production.example
+!.env.example
 audit/
 eval-reports/
 .DS_Store
