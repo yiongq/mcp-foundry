@@ -22,7 +22,7 @@
       <a href="#eval" class="nl">评测</a>
       <a href="#standards" class="nl">标准映射</a>
       <a href="#roadmap" class="nl">路线图</a>
-      <a href="https://github.com/yiongq/mcp-foundry" class="nl" target="_blank" rel="noopener">GitHub</a>
+      
     </div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
       <button class="langbtn" data-setlang="en">中 · <span style="color:var(--fg-muted)">EN</span></button>
@@ -148,7 +148,7 @@
           </div>
           <div style="padding:13px 20px;border-top:1px solid var(--border-subtle);background:var(--bg-base);font-size:12px;color:var(--fg-muted);line-height:1.7">归属约束叠加:只退自己名下订单,越权退款在审批前就 row_denied。金额缺失/非数值一律判「需审批」(fail-closed)。</div>
         </div>
-        <a href="https://github.com/yiongq/mcp-foundry/blob/main/THREAT_MODEL.md" style="display:inline-block;margin-top:18px;font-family:var(--font-mono);font-size:13px" target="_blank" rel="noopener">THREAT_MODEL.md · 逐条威胁→控制映射 →</a>
+        
       </div>
     </div>
   </div>
@@ -257,7 +257,7 @@ pnpm --filter @yiong/foundry-server serve
           <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">04</div>
           <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">身份源可信</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">sender open_id 由飞书服务端签发,经 identity.feishu.yaml 映射到 principal,全程留审计。</div></div>
         </div>
-        <a href="https://github.com/yiongq/mcp-foundry/tree/main/packages/feishu" style="font-family:var(--font-mono);font-size:13px" target="_blank" rel="noopener">packages/feishu · 搭建指南 →</a>
+        
       </div>
     </div>
   </div>
@@ -318,7 +318,7 @@ pnpm --filter @yiong/foundry-server serve
           <pre style="margin:0;padding:14px 18px;font-family:var(--font-mono);font-size:12px;line-height:1.7;color:var(--fg);overflow-x:auto;background:var(--bg-base)">pnpm --filter @yiong/foundry-eval run eval \
   --repeat 3 --ablation</pre>
         </div>
-        <a href="https://github.com/yiongq/mcp-foundry/blob/main/docs/eval-methodology.md" style="font-family:var(--font-mono);font-size:13px" target="_blank" rel="noopener">docs/eval-methodology.md · 完整方法与边界 →</a>
+        
       </div>
     </div>
   </div>
@@ -387,7 +387,7 @@ pnpm --filter @yiong/foundry-server serve
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">飞书 bot 三域端到端 + LangGraph 公网</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">真实飞书应用实测脱敏/拒答/审计；自建 LangGraph 前端上公网，连真实 Twenty，免注册可试。</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">对抗红队评测 + 攻击得手率指标</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">被劫持的 agent 试图伪造归属/越权改删/导出他人数据——红队攻击得手率 无守卫 77.2% → 生产配置 0%，由 ablation 跑出。</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">防篡改审计（Ed25519 签名哈希链）</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">可选开启</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">每条审计带 hash 链 + 签名：改一条断整链、伪造验签不过，校验只需公钥、可离线复核（verify-audit）。</div></div></div>
-<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">退款分级动作 + 威胁模型</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">审批闸门升级为分级放行（policy-as-code）：小额自动、超额/频繁挂起、身份核验前置。控制到 OWASP ASI/LLM + TC260 的逐条映射见 <a href="https://github.com/yiongq/mcp-foundry/blob/main/THREAT_MODEL.md" target="_blank" rel="noopener">THREAT_MODEL</a>。</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">退款分级动作 + 威胁模型</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">审批闸门升级为分级放行（policy-as-code）：小额自动、超额/频繁挂起、身份核验前置。控制到 OWASP ASI/LLM + TC260 的逐条映射见 THREAT_MODEL。</div></div></div>
         </div>
       </div>
       <div>
@@ -408,10 +408,10 @@ pnpm --filter @yiong/foundry-server serve
 <footer style="border-top:1px solid var(--border-subtle);padding:36px 28px;color:var(--fg-faint);font-size:12.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;max-width:1120px;margin:0 auto;box-sizing:border-box">
   <span style="font-family:var(--font-mono)">mcp-foundry</span>
   <span style="display:flex;gap:20px;flex-wrap:wrap">
-    <a href="https://github.com/yiongq/mcp-foundry" style="color:var(--fg-muted)" target="_blank" rel="noopener">GitHub</a>
-    <a href="https://github.com/yiongq/mcp-foundry/blob/main/THREAT_MODEL.md" style="color:var(--fg-muted)" target="_blank" rel="noopener">威胁模型</a>
-    <a href="https://github.com/yiongq/mcp-foundry/blob/main/docs/eval-methodology.md" style="color:var(--fg-muted)" target="_blank" rel="noopener">评测方法</a>
-    <a href="https://github.com/yiongq/mcp-foundry/blob/main/DEPLOY-CHECKLIST.md" style="color:var(--fg-muted)" target="_blank" rel="noopener">部署清单</a>
+    
+    
+    
+    
     <a href="/jwks.json" style="color:var(--fg-muted)" target="_blank" rel="noopener">公钥集 /jwks.json</a>
   </span>
 </footer>
@@ -428,7 +428,7 @@ pnpm --filter @yiong/foundry-server serve
       <a href="#eval-en" class="nl">Evals</a>
       <a href="#standards-en" class="nl">Standards</a>
       <a href="#roadmap-en" class="nl">Roadmap</a>
-      <a href="https://github.com/yiongq/mcp-foundry" class="nl" target="_blank" rel="noopener">GitHub</a>
+      
     </div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
       <button class="langbtn" data-setlang="zh"><span style="color:var(--fg-muted)">中</span> · EN</button>
@@ -554,7 +554,7 @@ pnpm --filter @yiong/foundry-server serve
           </div>
           <div style="padding:13px 20px;border-top:1px solid var(--border-subtle);background:var(--bg-base);font-size:12px;color:var(--fg-muted);line-height:1.7">Ownership stacked on top: refunds only for your own orders — an out-of-scope refund is row_denied before approval. Missing/non-numeric amounts always resolve to "needs approval" (fail-closed).</div>
         </div>
-        <a href="https://github.com/yiongq/mcp-foundry/blob/main/THREAT_MODEL.md" style="display:inline-block;margin-top:18px;font-family:var(--font-mono);font-size:13px" target="_blank" rel="noopener">THREAT_MODEL.md · threat → control map →</a>
+        
       </div>
     </div>
   </div>
@@ -663,7 +663,7 @@ pnpm --filter @yiong/foundry-server serve
           <div style="color:var(--accent-text);font-family:var(--font-mono);font-size:14px">04</div>
           <div><div style="font-weight:600;color:var(--fg-strong);margin-bottom:4px">Trusted identity source</div><div style="font-size:13.5px;color:var(--fg-muted);line-height:1.75">Sender open_id is issued by Feishu's servers, mapped via identity.feishu.yaml to a principal; everything is audited.</div></div>
         </div>
-        <a href="https://github.com/yiongq/mcp-foundry/tree/main/packages/feishu" style="font-family:var(--font-mono);font-size:13px" target="_blank" rel="noopener">packages/feishu · setup guide →</a>
+        
       </div>
     </div>
   </div>
@@ -724,7 +724,7 @@ pnpm --filter @yiong/foundry-server serve
           <pre style="margin:0;padding:14px 18px;font-family:var(--font-mono);font-size:12px;line-height:1.7;color:var(--fg);overflow-x:auto;background:var(--bg-base)">pnpm --filter @yiong/foundry-eval run eval \
   --repeat 3 --ablation</pre>
         </div>
-        <a href="https://github.com/yiongq/mcp-foundry/blob/main/docs/eval-methodology.md" style="font-family:var(--font-mono);font-size:13px" target="_blank" rel="noopener">docs/eval-methodology.md · full methodology →</a>
+        
       </div>
     </div>
   </div>
@@ -793,7 +793,7 @@ pnpm --filter @yiong/foundry-server serve
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Feishu bot ×3 domains + LangGraph public</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Masking / refusals / audit tested on a real Feishu app; a self-built LangGraph frontend is live against real Twenty, no signup.</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Adversarial red-team eval + attack-success metric</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">A hijacked agent attempts forged ownership / cross-owner writes / exfil — red-team attack success 77.2% (no guard) → 0% (production), measured via ablation.</div></div></div>
 <div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Tamper-evident audit (Ed25519 hash chain)</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">opt-in</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">Each record hash-chained + signed: alter one and the chain breaks, forge one and the signature fails; verification needs only the public key, offline (verify-audit).</div></div></div>
-<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Graded refund action + threat model</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">The approval gate becomes graded (policy-as-code): small auto, large/frequent held, identity check up front. Per-control mapping to OWASP ASI/LLM + TC260 in <a href="https://github.com/yiongq/mcp-foundry/blob/main/THREAT_MODEL.md" target="_blank" rel="noopener">THREAT_MODEL</a>.</div></div></div>
+<div style="display:flex;gap:16px;border-left:1px solid var(--border);padding:0 0 24px 20px;position:relative"><span style="position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--bg-base)"></span><div><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><span style="font-weight:600;color:var(--fg-strong);font-size:15px">Graded refund action + threat model</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">2026-07</span></div><div style="font-size:13px;color:var(--fg-muted);line-height:1.7">The approval gate becomes graded (policy-as-code): small auto, large/frequent held, identity check up front. Per-control mapping to OWASP ASI/LLM + TC260 in THREAT_MODEL.</div></div></div>
         </div>
       </div>
       <div>
@@ -814,9 +814,9 @@ pnpm --filter @yiong/foundry-server serve
 <footer style="border-top:1px solid var(--border-subtle);padding:36px 28px;color:var(--fg-faint);font-size:12.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;max-width:1120px;margin:0 auto;box-sizing:border-box">
   <span style="font-family:var(--font-mono)">mcp-foundry</span>
   <span style="display:flex;gap:20px;flex-wrap:wrap">
-    <a href="https://github.com/yiongq/mcp-foundry" style="color:var(--fg-muted)" target="_blank" rel="noopener">GitHub</a>
-    <a href="https://github.com/yiongq/mcp-foundry/blob/main/docs/eval-methodology.md" style="color:var(--fg-muted)" target="_blank" rel="noopener">Eval methodology</a>
-    <a href="https://github.com/yiongq/mcp-foundry/blob/main/DEPLOY-CHECKLIST.md" style="color:var(--fg-muted)" target="_blank" rel="noopener">Deploy checklist</a>
+    
+    
+    
     <a href="/jwks.json" style="color:var(--fg-muted)" target="_blank" rel="noopener">JWKS /jwks.json</a>
   </span>
 </footer>
