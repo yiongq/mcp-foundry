@@ -51,10 +51,32 @@ sed -i "s|^FOUNDRY_IDENTITY_SECRET=.*|FOUNDRY_IDENTITY_SECRET=$(openssl rand -ba
 
 ## 3. 起服务（无模型下载，秒级）
 
+两种方式任选（compose 里 `image:` 指 GHCR、`build:` 作兜底，两条都支持）：
+
+**A. 按摘要拉取（推荐 —— 部署物 = CI 测过的那一版）**
+
+```bash
+# 一次性：登录 GHCR 才能拉镜像（PAT 需 read:packages；把 GHCR 包设为 public 则免登录）
+echo "$GHCR_PAT" | docker login ghcr.io -u yiongq --password-stdin
+
+docker compose pull            # 拉 latest（= 最新 main，CI push 时已构建）
+docker compose up -d           # 起来，不本地构建
+```
+
+**B. 本机现建（离线 / 不想接 GHCR 时的兜底，即老流程）**
+
 ```bash
 docker compose up --build -d
+```
+
+任一方式之后：
+
+```bash
 docker compose logs foundry-server | tail -3   # 应见 "identity: signed token"
 ```
+
+**回滚 / 钉某一版**：`FOUNDRY_IMAGE_TAG=<git-sha> docker compose up -d`
+（sha 见 GitHub Actions 或 `git log`；缺省 `latest`）。LangGraph 前端（§8）同样支持 A/B 两条。
 
 若日志出现 `identity: DEMO trust headers … unsigned, anyone can claim any role`
 → 密钥没注进去，**立刻停下排查**，别接 Caddy。（新版默认 fail-closed：缺签名身份且未设
@@ -64,9 +86,7 @@ docker compose logs foundry-server | tail -3   # 应见 "identity: signed token"
 > root 属主建的，新容器写审计会 `EACCES`。首次升级后 chown 一次：
 > `docker run --rm -v mcp-foundry_foundry-audit:/audit alpine chown -R 10001:10001 /audit`
 >
-> **按摘要部署（推荐）**：CI 已把 `ghcr.io/<owner>/mcp-foundry-server:<sha>` 推到 GHCR。
-> 生产可 `docker compose pull` 拉 CI 验证过的那一版，而不是在 VPS 上 `--build` 现建
-> （部署物 = 测试物，保留旧 SHA 标签可一键回滚）。就绪/指标探针：`/readyz`（查 JWKS 可用）、`/metrics`（Prometheus）。
+> 就绪/指标探针：`/readyz`（查 JWKS 可用，fail-closed 时 503）、`/metrics`（Prometheus）。
 
 ## 4. 冒烟（先本机，再公网）
 
