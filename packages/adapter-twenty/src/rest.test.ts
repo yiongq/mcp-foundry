@@ -142,6 +142,40 @@ describe('TwentyRestBackend 字段映射', () => {
     expect(updated?.stage).toBe('Closed Won');
   });
 
+  it('getPipelineSummary：owner_name 用演示名表映射(e007→林哲)；Twenty 枚举经 stage 映射后 won/open 正确分桶', async () => {
+    const { fetchImpl } = makeFetch([
+      {
+        json: {
+          data: {
+            opportunities: [
+              {
+                id: 'o1',
+                name: 'A',
+                stage: 'PROPOSAL',
+                amount: { amountMicros: '480000000000' },
+                ownerId: 'e007',
+              },
+              {
+                id: 'o2',
+                name: 'B',
+                stage: 'CUSTOMER',
+                amount: { amountMicros: '150000000000' },
+                ownerId: 'e008',
+              },
+            ],
+          },
+        },
+      },
+    ]);
+    const rows = await backend(fetchImpl).getPipelineSummary();
+    const e007 = rows.find((r) => r.owner_id === 'e007');
+    const e008 = rows.find((r) => r.owner_id === 'e008');
+    expect(e007?.owner_name).toBe('林哲'); // 不再是 'e007'
+    expect(e007?.open_amount).toBe(480000); // PROPOSAL → 规范 Proposal → open
+    expect(e008?.owner_name).toBe('罗宁');
+    expect(e008?.won_amount).toBe(150000); // CUSTOMER → 规范 Closed Won → won
+  });
+
   it('拆分姓名读回带空格（John Smith，非 JohnSmith）', async () => {
     const { fetchImpl } = makeFetch([
       { json: { data: { person: { ...PERSON, name: { firstName: 'John', lastName: 'Smith' } } } } },

@@ -13,6 +13,7 @@ import type {
   TwentyBackend,
   UpdateContactPatch,
 } from './backend.js';
+import { FIXTURE_OWNERS } from './fixtures.js';
 import { canonicalStageToTwenty, twentyStageToCanonical } from './stage.js';
 
 /**
@@ -306,7 +307,9 @@ export class TwentyRestBackend implements TwentyBackend {
     for (const o of opps) {
       const row = byOwner.get(o.owner_id) ?? {
         owner_id: o.owner_id,
-        owner_name: o.owner_id,
+        // Twenty 的 repCode 只是文本归属字段（e007），没关联到 workspaceMember——真人姓名只在
+        // 演示 owner 名表里。与 fixture 后端同源，盘点表显示「林哲/罗宁」而非「e007/e008」。
+        owner_name: FIXTURE_OWNERS[o.owner_id] ?? o.owner_id,
         open_count: 0,
         open_amount: 0,
         won_count: 0,
