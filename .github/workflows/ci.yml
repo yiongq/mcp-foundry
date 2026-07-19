@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4 # 版本取 package.json 的 packageManager 字段
+      - uses: pnpm/action-setup@v6 # 版本取 package.json 的 packageManager 字段
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v5
         with:
           node-version: 22
