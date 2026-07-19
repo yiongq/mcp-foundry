@@ -121,17 +121,20 @@ jobs:
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          # 非 root 部署：登录专用 deploy 用户（docker 组，无 root SSH），密钥禁 PTY/转发。
           SSHOPT="ssh -i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=accept-new"
+          DEST="deploy@${{ secrets.VPS_HOST }}"
           # 镜像里已含 packages/* 与 config/rbac；这里补齐运行时需要但不在镜像里的：compose 文件
           # （GHCR image 引用——旧 VPS compose 指的是本地镜像，不同步就永远拉不到新镜像）、landing
           # 静态页、config/Caddyfile。严格排除 .env / 审计 / 飞书身份，绝不覆盖服务器侧密钥与数据。
-          rsync -az -e "$SSHOPT" \
+          # -rlptz（非 -a）：不保留 owner/group（deploy 无权 chown，文件自然归 deploy）。
+          rsync -rlptz -e "$SSHOPT" \
             --exclude node_modules --exclude .git --exclude .env \
             --exclude '.venv' --exclude '__pycache__' --exclude '*.pyc' \
             --exclude 'audit/*.jsonl' --exclude eval-reports \
             --exclude config/identity.feishu.yaml \
-            ./ root@"${{ secrets.VPS_HOST }}":/opt/mcp-foundry/
-          $SSHOPT root@"${{ secrets.VPS_HOST }}" 'bash -s' <<'DEPLOY'
+            ./ "$DEST":/opt/mcp-foundry/
+          $SSHOPT "$DEST" 'bash -s' <<'DEPLOY'
           set -euo pipefail
           export FOUNDRY_IMAGE_TAG=${{ github.sha }}
           # 幂等保障：审计卷归非 root 容器（uid 10001）所有，免得首次非 root 部署写审计 EACCES
