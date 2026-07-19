@@ -1,7 +1,7 @@
 # LangGraph 前端生产镜像。network_mode host（见 docker-compose.yml），uvicorn 绑宿主 loopback。
 # 硬化：基础镜像按摘要固定（Dependabot 升级）；非 root 运行；HEALTHCHECK 探 /api/config。
 # uvicorn 自带 SIGTERM/SIGINT 优雅关闭处理器，无需 tini。
-FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de
+FROM python:3.14-slim@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6
 
 WORKDIR /app
 
