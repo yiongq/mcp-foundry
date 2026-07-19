@@ -124,7 +124,11 @@ export function createGatewayApprovals(
   const base = baseUrl.replace(/\/+$/, '');
   return {
     async listPending(): Promise<PendingRecord[]> {
-      const res = await fetchImpl(`${base}/approvals`, { headers });
+      // 轮询网关不能被卡死的连接无限挂起（否则整条 relay 轮询停摆）
+      const res = await fetchImpl(`${base}/approvals`, {
+        headers,
+        signal: AbortSignal.timeout(10_000),
+      });
       if (!res.ok) throw new Error(`GET /approvals → HTTP ${res.status}`);
       const body = (await res.json()) as { approvals?: PendingRecord[] };
       return body.approvals ?? [];
@@ -134,6 +138,7 @@ export function createGatewayApprovals(
         method: 'POST',
         headers: { ...headers, 'content-type': 'application/json' },
         body: JSON.stringify({ decision }),
+        signal: AbortSignal.timeout(10_000),
       });
       if (res.status === 200) return { status: 200 };
       let error: string | undefined;

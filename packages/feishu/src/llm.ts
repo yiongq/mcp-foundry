@@ -14,6 +14,8 @@ export interface LlmOptions {
   fetchImpl?: typeof fetch;
   /** 工具循环上限，防失控；缺省 6 */
   maxTurns?: number;
+  /** 单轮 LLM 请求超时；缺省 60s，超时即抛（fail-closed），避免上游卡死拖垮整条对话 */
+  timeoutMs?: number;
   temperature?: number;
   /** 关掉思考链（智谱 GLM 的 thinking 参数）——对话场景延迟优先；其他厂商忽略此项 */
   disableThinking?: boolean;
@@ -66,6 +68,7 @@ export async function runToolLoop(
 ): Promise<string> {
   const doFetch = options.fetchImpl ?? fetch;
   const maxTurns = options.maxTurns ?? 6;
+  const timeoutMs = options.timeoutMs ?? 60_000;
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userText },
@@ -93,6 +96,7 @@ export async function runToolLoop(
             }
           : {}),
       }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) {
       throw new Error(`LLM API ${response.status}: ${(await response.text()).slice(0, 200)}`);

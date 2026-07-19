@@ -17,6 +17,8 @@ export interface LlmJudgeOptions {
   /** 测试注入用；缺省全局 fetch */
   fetchImpl?: typeof fetch;
   temperature?: number;
+  /** 单次评判请求超时；缺省 60s，超时即抛，评测不被慢/卡的 judge 拖死 */
+  timeoutMs?: number;
 }
 
 const verdictSchema = z.object({
@@ -68,6 +70,7 @@ export function createLlmJudge(options: LlmJudgeOptions): SoftJudge {
             { role: 'user', content: JSON.stringify(payload, null, 2) },
           ],
         }),
+        signal: AbortSignal.timeout(options.timeoutMs ?? 60_000),
       });
       if (!response.ok) {
         throw new Error(`judge API ${response.status}: ${(await response.text()).slice(0, 200)}`);
