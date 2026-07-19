@@ -102,3 +102,35 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/foundry-langgraph-client:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # 自动部署（CD）：push 到 main、全部质量门 + 镜像推送都过后，SSH 进 VPS 拉这次构建的
+  # 确切镜像（按 SHA，可复现/可回滚）重启并冒烟。合并即上线，人不用碰服务器。
+  # 需要仓库密钥：VPS_SSH_KEY（部署专用 SSH 私钥）、VPS_HOST（服务器 IP）。
+  deploy:
+    if: github.event_name == 'push'
+    needs: [checks, python-client, eval-gate, docker]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to VPS over SSH
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new root@"${{ secrets.VPS_HOST }}" 'bash -s' <<'DEPLOY'
+          set -euo pipefail
+          export FOUNDRY_IMAGE_TAG=${{ github.sha }}
+          # 幂等保障：审计卷归非 root 容器（uid 10001）所有，免得首次非 root 部署写审计 EACCES
+          docker run --rm -v mcp-foundry_foundry-audit:/audit alpine chown -R 10001:10001 /audit >/dev/null 2>&1 || true
+          cd /opt/mcp-foundry && docker compose pull && docker compose up -d
+          cd clients/langgraph && docker compose pull && docker compose up -d
+          for i in $(seq 1 20); do curl -fsS -m 5 http://127.0.0.1:3100/healthz >/dev/null && break; sleep 2; done
+          curl -fsS -m 10 http://127.0.0.1:3100/healthz >/dev/null && echo "OK gateway healthz"
+          code=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:3100/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' -H 'x-foundry-user: e004' -H 'x-foundry-role: hr_admin' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}')
+          test "$code" = "401" && echo "OK forged header -> 401 (signed mode enforced)" || { echo "FAIL forged header -> $code (want 401)"; exit 1; }
+          curl -fsS -m 10 http://127.0.0.1:8100/api/config >/dev/null && echo "OK langgraph"
+          echo "deployed ${{ github.sha }}"
+          DEPLOY
