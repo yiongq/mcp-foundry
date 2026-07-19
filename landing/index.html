@@ -35,8 +35,8 @@
   <div aria-hidden="true" style="position:absolute;inset:0;background:radial-gradient(46% 60% at 30% 20%, color-mix(in oklab,var(--accent) 7%,transparent),transparent 70%);pointer-events:none"></div>
   <div style="max-width:1120px;margin:0 auto;padding:0 28px;position:relative;animation:aiIn 520ms cubic-bezier(0.16,1,0.3,1)">
     <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:18px">Guarded MCP Gateway · 线上可体验 · 免注册 · 双域真库验证过（Twenty 线上）</div>
-    <h1 style="margin:0;font-size:clamp(42px,5.4vw,80px);font-weight:700;letter-spacing:-0.045em;line-height:1.08;color:var(--fg-strong);text-wrap:balance">给 Agent 接内部系统,<br>先加一道<span style="color:var(--accent)">守卫</span></h1>
-    <p style="font-size:clamp(17px,2vw,20px);color:var(--fg-muted);margin:22px 0 34px;max-width:720px">角色定工具面、行级过滤、字段脱敏、逐调用审计。不该看到的工具连 tools/list 都不出现——不是模型忍住不说,是数据根本没进上下文。</p>
+    <h1 style="margin:0;font-size:clamp(42px,5.4vw,80px);font-weight:700;letter-spacing:-0.045em;line-height:1.08;color:var(--fg-strong);text-wrap:balance">给 Agent 接内部系统,<br>先加一道<span style="color:var(--accent)">守卫网关</span></h1>
+    <p style="font-size:clamp(17px,2vw,20px);color:var(--fg-muted);margin:22px 0 34px;max-width:720px"><strong style="color:var(--fg-strong)">一层协议级(MCP)、与 agent 框架无关的守卫网关</strong>——所有入口共用同一套守卫,HR/CRM 等系统即插即用。角色定工具面、行级过滤、字段脱敏、逐调用审计:不该看到的工具连 tools/list 都不出现,不是模型忍住不说,是数据根本没进上下文。</p>
       </div>
 </header>
 
@@ -441,8 +441,8 @@ pnpm --filter @yiong/foundry-server serve
   <div aria-hidden="true" style="position:absolute;inset:0;background:radial-gradient(46% 60% at 30% 20%, color-mix(in oklab,var(--accent) 7%,transparent),transparent 70%);pointer-events:none"></div>
   <div style="max-width:1120px;margin:0 auto;padding:0 28px;position:relative;animation:aiIn 520ms cubic-bezier(0.16,1,0.3,1)">
     <div style="font-family:var(--font-mono);font-size:12.5px;color:var(--accent-text);letter-spacing:.08em;margin-bottom:18px">Guarded MCP Gateway · live demo · no signup · two real backends verified (Twenty live)</div>
-    <h1 style="margin:0;font-size:clamp(40px,5vw,74px);font-weight:700;letter-spacing:-0.04em;line-height:1.06;color:var(--fg-strong);text-wrap:balance">Put a <span style="color:var(--accent)">guard</span> in front of<br>your internal systems</h1>
-    <p style="font-size:clamp(17px,2vw,20px);color:var(--fg-muted);margin:22px 0 34px;max-width:720px">Role-scoped tools, row-level filtering, field masking, per-call audit. Off-limits tools never appear in tools/list at all — it's not the model holding back; the data never enters the context.</p>
+    <h1 style="margin:0;font-size:clamp(40px,5vw,74px);font-weight:700;letter-spacing:-0.04em;line-height:1.06;color:var(--fg-strong);text-wrap:balance">Put a <span style="color:var(--accent)">guarded MCP gateway</span> in front of<br>your internal systems</h1>
+    <p style="font-size:clamp(17px,2vw,20px);color:var(--fg-muted);margin:22px 0 34px;max-width:720px"><strong style="color:var(--fg-strong)">One protocol-level (MCP), framework-agnostic guard layer</strong> — every entrypoint shares the same guard; HR, CRM and any system plug in. Role-scoped tools, row-level filtering, field masking, per-call audit: off-limits tools never appear in tools/list at all — it's not the model holding back; the data never enters the context.</p>
       </div>
 </header>
 
