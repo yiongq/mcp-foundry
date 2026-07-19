@@ -22,6 +22,24 @@ jobs:
       - run: pnpm lint
       - run: pnpm -r typecheck
       - run: pnpm -r test
+      # 安全内核覆盖率门禁（阈值在 packages/core/vitest.config.ts）——一处未测分支最危险
+      - run: pnpm --filter @yiong/foundry-core exec vitest run --coverage
+
+  python-client:
+    # LangGraph 客户端此前完全不进 CI——整条框架绑定可能悄悄回归。ruff + pytest 门住它。
+    # test_live_gateway.py 未设 FOUNDRY_TEST_LIVE 时自跳过，CI 里不需要外部网关。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/langgraph
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: pytest -q
 
   eval-gate:
     runs-on: ubuntu-latest
@@ -46,3 +64,41 @@ jobs:
           name: eval-report
           path: eval-reports/report.md
           if-no-files-found: error
+
+  # 容器构建：PR 只构建（抓 Dockerfile 回归）；push 到 main 额外推送带 SHA 摘要标签的镜像到
+  # GHCR，于是部署可「按摘要拉取 CI 验证过的那一版」，而不是在 VPS 上从源码现建（部署物 = 测试物）。
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR (push to main only)
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build (+push on main) foundry-server
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/mcp-foundry-server:latest
+            ghcr.io/${{ github.repository_owner }}/mcp-foundry-server:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build (+push on main) langgraph-client
+        uses: docker/build-push-action@v6
+        with:
+          context: clients/langgraph
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/foundry-langgraph-client:latest
+            ghcr.io/${{ github.repository_owner }}/foundry-langgraph-client:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,57 @@
+# mcp-foundry 反向代理配置（此前只存在于服务器 /etc/caddy/Caddyfile，未入库、不可复现）。
+# 现纳入版本控制——部署时 symlink 或 import 进主 Caddyfile，改这里、走 PR、再上线。
+#
+# 三域同机，只对公网出 HTTPS（Caddy 自动签发/续期 Let's Encrypt）：容器全绑 127.0.0.1，
+# 公网流量必须经 Caddy 进来。
+#
+# 边缘限流用 caddy-ratelimit 插件（stock Caddy 不含）——需 xcaddy 构建：
+#   xcaddy build --with github.com/mholt/caddy-ratelimit
+# 未装插件时删掉 rate_limit 块即可正常起（限流退化为无，其余照常生效）。
+
+# 安全响应头（三域共用）
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+# ── 网关：签名令牌鉴权，高危写走审批。限流 + 请求体上限在边缘再兜一层 ──────────────
+foundry.yiongspace.com {
+	import security_headers
+	# 请求体上限：应用层已在 /mcp、/approvals 各封顶 1 MiB，边缘再挡一道，省得大包进到 Node 才拒
+	request_body {
+		max_size 1MB
+	}
+	# 令牌暴力破解 / 洪泛防护（需 caddy-ratelimit 插件）
+	rate_limit {
+		zone foundry_mcp {
+			key {remote_host}
+			events 120
+			window 1m
+		}
+	}
+	reverse_proxy 127.0.0.1:3100
+}
+
+# ── CRM 助手（LangGraph 自建流式前端，免注册访客可体验）。访客调真实 GLM key——限流防刷 ──
+crm.yiongspace.com {
+	import security_headers
+	rate_limit {
+		zone crm_guest {
+			key {remote_host}
+			events 60
+			window 1m
+		}
+	}
+	reverse_proxy 127.0.0.1:8100
+}
+
+# ── Twenty CRM 真库（演示后端）──────────────────────────────────────────────
+twenty.yiongspace.com {
+	import security_headers
+	reverse_proxy 127.0.0.1:3200
+}

@@ -57,7 +57,16 @@ docker compose logs foundry-server | tail -3   # 应见 "identity: signed token"
 ```
 
 若日志出现 `identity: DEMO trust headers … unsigned, anyone can claim any role`
-→ 密钥没注进去，**立刻停下排查**，别接 Caddy。
+→ 密钥没注进去，**立刻停下排查**，别接 Caddy。（新版默认 fail-closed：缺签名身份且未设
+`FOUNDRY_DEMO=1` 时进程直接拒绝启动，compose 的 `:?` 再兜一道。）
+
+> **非 root 迁移（一次性）**：镜像现以非 root（uid 10001）运行。若 `foundry-audit` 卷是早先
+> root 属主建的，新容器写审计会 `EACCES`。首次升级后 chown 一次：
+> `docker run --rm -v mcp-foundry_foundry-audit:/audit alpine chown -R 10001:10001 /audit`
+>
+> **按摘要部署（推荐）**：CI 已把 `ghcr.io/<owner>/mcp-foundry-server:<sha>` 推到 GHCR。
+> 生产可 `docker compose pull` 拉 CI 验证过的那一版，而不是在 VPS 上 `--build` 现建
+> （部署物 = 测试物，保留旧 SHA 标签可一键回滚）。就绪/指标探针：`/readyz`（查 JWKS 可用）、`/metrics`（Prometheus）。
 
 ## 4. 冒烟（先本机，再公网）
 
@@ -71,26 +80,19 @@ hr_admin 4 工具含 get_salary / 篡改签名 401。
 
 ## 5. Caddy（三个站点）
 
-网关站点先起最简形态（§11 会给它加 /jwks.json 与落地页分流，§12/§13 加 /approvals*）。
+反代配置现纳入版本控制：[`config/Caddyfile`](config/Caddyfile)（含安全响应头、请求体上限、
+可选边缘限流）。别再手写 `/etc/caddy/Caddyfile`——从仓库 import，改配置走 PR：
 
 ```bash
-cat >>/etc/caddy/Caddyfile <<'EOF'
-
-foundry.yiongspace.com {
-    reverse_proxy 127.0.0.1:3100
-}
-
-crm.yiongspace.com {
-    reverse_proxy 127.0.0.1:8100
-}
-
-twenty.yiongspace.com {
-    reverse_proxy 127.0.0.1:3200
-}
-EOF
+# 主 Caddyfile import 仓库版（部署目录假设 /opt/mcp-foundry）
+grep -q 'import /opt/mcp-foundry/config/Caddyfile' /etc/caddy/Caddyfile \
+  || echo 'import /opt/mcp-foundry/config/Caddyfile' >>/etc/caddy/Caddyfile
 systemctl reload caddy
 BASE=https://foundry.yiongspace.com bash smoke.sh   # 公网版，仍需五针全绿
 ```
+
+> 边缘限流用 `caddy-ratelimit` 插件（stock Caddy 不含）——见 `config/Caddyfile` 顶部 xcaddy
+> 构建说明。未装插件时删掉 `rate_limit` 块即可正常起（安全头/请求体上限照常生效）。
 
 Caddy 自动签发/续期证书。
 
@@ -178,7 +180,7 @@ curl -m 8 --noproxy '*' https://foundry.yiongspace.com/healthz   # 期望：200
 ## 10. 收尾
 
 - [ ] README 诚实边界更新：公网演示地址、令牌到期口径
-- [ ] 审计卷备份策略（`foundry-audit` 卷，可选）
+- [ ] 审计 + Twenty 备份入 cron 每日：`BACKUP_DIR=/opt/foundry-backups OFFSITE_RCLONE_REMOTE=… bash scripts/backup.sh`（[scripts/backup.sh](scripts/backup.sh)）。防篡改 ≠ 不丢，异地副本必备
 - [ ] 数据口径：HR 域仍是 6 人 fixture；CRM 域是真实 Twenty（演示口径，非生产规模）
 
 ## 11. 切换到 JWKS / 轮换演示令牌（W7，已实操）

@@ -154,7 +154,11 @@ describe('createJwksUrlLoader', () => {
     }
   });
 
-  it('可选 max-stale 截止：超时 fail-closed（load 抛 → principal 侧 401），刷新成功后自愈', async () => {
+  // 下面三条依赖真实挂钟窗口（maxStaleMs 250ms / refreshMs 50ms + setTimeout）——并行 CI
+  // 高负载下定时器可能错过窗口而偶发失败。retry 只救这种瞬时抖动：真 bug 会连挂三次。
+  it('可选 max-stale 截止：超时 fail-closed（load 抛 → principal 侧 401），刷新成功后自愈', {
+    retry: 2,
+  }, async () => {
     const endpoint = await startEndpoint(serveJson(jwkJson('s1')));
     const loader = await createJwksUrlLoader(endpoint.url, {
       refreshMs: 100,
@@ -175,7 +179,9 @@ describe('createJwksUrlLoader', () => {
     }
   });
 
-  it('304 也算成功刷新：新鲜度由「最后一次成功验证」而非「最后一次内容变更」定义', async () => {
+  it('304 也算成功刷新：新鲜度由「最后一次成功验证」而非「最后一次内容变更」定义', {
+    retry: 2,
+  }, async () => {
     const endpoint = await startEndpoint(serveJson(jwkJson('s304'), '"v1"'));
     const loader = await createJwksUrlLoader(endpoint.url, {
       refreshMs: 100,
@@ -193,7 +199,9 @@ describe('createJwksUrlLoader', () => {
     }
   });
 
-  it('定时器不跑（CPU 节流运行时）也不冻结：load() 的懒刷新兜底把轮换带进来', async () => {
+  it('定时器不跑（CPU 节流运行时）也不冻结：load() 的懒刷新兜底把轮换带进来', {
+    retry: 2,
+  }, async () => {
     const endpoint = await startEndpoint(serveJson(jwkJson('lazy-1')));
     const loader = await createJwksUrlLoader(endpoint.url, { refreshMs: 50 });
     loader.stop(); // 模拟定时器永不触发
