@@ -3,6 +3,51 @@
 > Guarded MCP gateway for internal business systems — role-scoped tools, row/field-level data
 > guards, human-in-the-loop approvals, and a per-call audit trail.
 
+[![CI](https://github.com/yiongq/mcp-foundry/actions/workflows/ci.yml/badge.svg)](https://github.com/yiongq/mcp-foundry/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Live demo](https://img.shields.io/badge/live%20demo-crm.yiongspace.com-2ea043)](https://crm.yiongspace.com)
+
+**TL;DR** — Put internal systems (HR, CRM) behind an MCP server with a security guard done at the
+infrastructure layer, independent of any agent framework. Same guard for every entrypoint:
+
+- **Role → tool whitelist** — unauthorized tools never appear in `tools/list` (not "denied after the call").
+- **Row filter + field mask** — structured rules enforced at the guard's *exit*, not by prompting; the
+  refusal branch has no `data` field *at the type level*, so it structurally cannot smuggle business data.
+- **Human-in-the-loop approval** — high-risk writes are gated *before* `execute`; graded policy-as-code
+  (refund: small auto-passes, > ¥500 or ≥ 2/month → approval + identity check + ownership constraint).
+- **Tamper-evident audit** — optional Ed25519 signed hash chain; edit one line and `verify-audit` fails,
+  offline-checkable with just the public key. Logs param *hashes*, never raw PII.
+- **Headline metric** — red-team attack-success rate **77.2% (no guard) → 0% (all guards on)**, quantified
+  by a guard-layer ablation and reproducible with one command ([sample report](docs/eval-report.sample.md)).
+
+**Live demo** (no signup): [crm.yiongspace.com](https://crm.yiongspace.com) — a self-built LangGraph
+streaming UI on the production gateway (`https://foundry.yiongspace.com/mcp`, ES256 tokens), backed by a
+real [Twenty CRM](https://twenty.yiongspace.com). · **Threat model** (controls mapped to OWASP Agentic/LLM
+Top 10 + TC260, with an honest *not-covered* list): [THREAT_MODEL.md](THREAT_MODEL.md) ·
+**Security policy:** [SECURITY.md](SECURITY.md).
+
+```mermaid
+flowchart TD
+  MCP["MCP client<br/>Claude Code / any Streamable HTTP host"]
+  LG["LangGraph client<br/>Python + FastAPI, streaming UI"]
+  FS["Feishu bot<br/>long-poll, no public callback"]
+  RBAC["config/rbac.*.yaml<br/>roles→tools · approval list · row rules · masked fields"]
+  G["packages/core — Guard pipeline (single choke point)<br/>role lookup → tool whitelist → <b>approval gate (pre-write)</b> → row filter → field mask → audit"]
+  A["SystemAdapter (hot-swappable, same tools & guard)<br/>orangehrm (HR) · twenty (CRM: fixture/REST) · memory"]
+  AUD["audit JSONL + approvals JSONL<br/>Ed25519 signed hash chain (optional)"]
+  MCP --> G
+  LG --> G
+  FS --> G
+  RBAC -. config .-> G
+  G --> A
+  G --> AUD
+```
+
+> 下面是中文深度稿：架构决策、威胁模型逐条映射、诚实边界。English readers — the TL;DR above plus
+> [THREAT_MODEL.md](THREAT_MODEL.md) and [docs/eval-methodology.md](docs/eval-methodology.md) carry the depth.
+
+---
+
 把内部系统（先做 HR，现已加上 CRM 演示域）接到 MCP 上，并在协议层前面加一道守卫：
 谁、能用哪些工具、能看到哪些行哪些字段，高危写操作先过人的点头，问过什么都有账可查。
 
