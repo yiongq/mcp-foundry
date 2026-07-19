@@ -114,21 +114,35 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v5
       - name: Deploy to VPS over SSH
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new root@"${{ secrets.VPS_HOST }}" 'bash -s' <<'DEPLOY'
+          SSHOPT="ssh -i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=accept-new"
+          # 镜像里已含 packages/* 与 config/rbac；这里补齐运行时需要但不在镜像里的：compose 文件
+          # （GHCR image 引用——旧 VPS compose 指的是本地镜像，不同步就永远拉不到新镜像）、landing
+          # 静态页、config/Caddyfile。严格排除 .env / 审计 / 飞书身份，绝不覆盖服务器侧密钥与数据。
+          rsync -az -e "$SSHOPT" \
+            --exclude node_modules --exclude .git --exclude .env \
+            --exclude '.venv' --exclude '__pycache__' --exclude '*.pyc' \
+            --exclude 'audit/*.jsonl' --exclude eval-reports \
+            --exclude config/identity.feishu.yaml \
+            ./ root@"${{ secrets.VPS_HOST }}":/opt/mcp-foundry/
+          $SSHOPT root@"${{ secrets.VPS_HOST }}" 'bash -s' <<'DEPLOY'
           set -euo pipefail
           export FOUNDRY_IMAGE_TAG=${{ github.sha }}
           # 幂等保障：审计卷归非 root 容器（uid 10001）所有，免得首次非 root 部署写审计 EACCES
           docker run --rm -v mcp-foundry_foundry-audit:/audit alpine chown -R 10001:10001 /audit >/dev/null 2>&1 || true
-          cd /opt/mcp-foundry && docker compose pull && docker compose up -d
+          cd /opt/mcp-foundry && docker compose pull && docker compose up -d --remove-orphans
           cd clients/langgraph && docker compose pull && docker compose up -d
           for i in $(seq 1 20); do curl -fsS -m 5 http://127.0.0.1:3100/healthz >/dev/null && break; sleep 2; done
           curl -fsS -m 10 http://127.0.0.1:3100/healthz >/dev/null && echo "OK gateway healthz"
+          # 升级真验证：/readyz 是硬化栈才有的端点——200 才证明新镜像真在跑（不是旧容器蒙混）
+          rc=$(curl -s -m 10 -o /dev/null -w '%{http_code}' http://127.0.0.1:3100/readyz)
+          test "$rc" = "200" && echo "OK /readyz 200 (new hardened image live)" || { echo "FAIL /readyz -> $rc (old image still running?)"; exit 1; }
           code=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:3100/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' -H 'x-foundry-user: e004' -H 'x-foundry-role: hr_admin' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}')
           test "$code" = "401" && echo "OK forged header -> 401 (signed mode enforced)" || { echo "FAIL forged header -> $code (want 401)"; exit 1; }
           curl -fsS -m 10 http://127.0.0.1:8100/api/config >/dev/null && echo "OK langgraph"
