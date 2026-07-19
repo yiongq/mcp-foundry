@@ -22,6 +22,19 @@ describe('ES256 × JWKS', () => {
     expect(verdict).toEqual({ ok: true, principal: WHO });
   });
 
+  it('aud 绑定经 ES256 签发 + JWKS 验签生效：期望匹配放行，不符即拒', () => {
+    const { pem, jwk } = es256Issuer('k-aud');
+    const token = mintIdentityTokenEs256(pem, 'k-aud', WHO, 3600, undefined, {
+      aud: 'mcp-foundry',
+    });
+    expect(
+      verifyIdentityTokenJwks({ keys: [jwk] }, token, undefined, { aud: 'mcp-foundry' }),
+    ).toEqual({ ok: true, principal: WHO });
+    expect(
+      verifyIdentityTokenJwks({ keys: [jwk] }, token, undefined, { aud: 'other-svc' }).ok,
+    ).toBe(false);
+  });
+
   it('密钥轮换：新旧 kid 并存都验过；旧键从集合删除后旧令牌立即失效', () => {
     const old = es256Issuer('2026-01');
     const fresh = es256Issuer('2026-07');

@@ -30,7 +30,18 @@ export interface IdentityClaims {
   /** 可选：按系统覆盖角色（多帽子）。签发方背书，与签名一同被验。缺省回落到 role。 */
   roles?: Record<string, string>;
   iat: number;
+  /** 生效时间（not-before）。签发即置 = iat；验签带小幅时钟偏移容忍。 */
+  nbf?: number;
   exp: number;
+  /** 可选受众/签发方绑定：多签发方共用一套 JWKS 时，验签方声明期望即可挡住「发给别的服务的令牌」。 */
+  aud?: string;
+  iss?: string;
+}
+
+/** 受众/签发方绑定：签发时写入令牌，验签时按期望值校验（仅在声明期望时生效）。 */
+export interface ClaimBinding {
+  aud?: string;
+  iss?: string;
 }
 
 export type TokenVerdict =
@@ -50,7 +61,12 @@ function assertSecret(secret: string): void {
   }
 }
 
-function buildClaims(principal: Principal, ttlSeconds: number, issuedAt: number): IdentityClaims {
+function buildClaims(
+  principal: Principal,
+  ttlSeconds: number,
+  issuedAt: number,
+  binding?: ClaimBinding,
+): IdentityClaims {
   if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
     throw new Error('ttlSeconds must be a positive number');
   }
@@ -59,7 +75,10 @@ function buildClaims(principal: Principal, ttlSeconds: number, issuedAt: number)
     role: principal.role,
     ...(principal.rolesBySystem !== undefined ? { roles: principal.rolesBySystem } : {}),
     iat: issuedAt,
+    nbf: issuedAt,
     exp: issuedAt + ttlSeconds,
+    ...(binding?.aud !== undefined ? { aud: binding.aud } : {}),
+    ...(binding?.iss !== undefined ? { iss: binding.iss } : {}),
   };
 }
 
@@ -74,7 +93,7 @@ function validRolesClaim(roles: unknown): roles is Record<string, string> {
 }
 
 /** 签名通过之后才解析 payload；三段式/空段在调用方已挡掉。 */
-function parseVerifiedClaims(payload: string, now: number): TokenVerdict {
+function parseVerifiedClaims(payload: string, now: number, expect?: ClaimBinding): TokenVerdict {
   let claims: Partial<IdentityClaims>;
   try {
     claims = JSON.parse(
@@ -92,7 +111,21 @@ function parseVerifiedClaims(payload: string, now: number): TokenVerdict {
   ) {
     return { ok: false, reason: 'bad_claims' };
   }
+  // 未生效（nbf）：允许签发方发未来生效令牌；带 30s 时钟偏移容忍，超前太多即拒。
+  const NBF_LEEWAY_SECONDS = 30;
+  if (Number.isFinite(claims.nbf) && (claims.nbf as number) > now + NBF_LEEWAY_SECONDS) {
+    return { ok: false, reason: 'bad_claims' };
+  }
   if ((claims.exp as number) <= now) return { ok: false, reason: 'expired' };
+
+  // 受众/签发方绑定：仅当验签方声明期望值才校验（未声明 = 不校验，向后兼容）。多签发方
+  // 共用一套 JWKS 时，这道挡住「本该发给别的服务的令牌，凭 role 声明在此被接受」。
+  if (expect?.aud !== undefined && claims.aud !== expect.aud) {
+    return { ok: false, reason: 'bad_claims' };
+  }
+  if (expect?.iss !== undefined && claims.iss !== expect.iss) {
+    return { ok: false, reason: 'bad_claims' };
+  }
 
   return {
     ok: true,
@@ -115,10 +148,11 @@ export function mintIdentityToken(
   principal: Principal,
   ttlSeconds: number,
   issuedAt = nowSeconds(),
+  binding?: ClaimBinding,
 ): string {
   assertSecret(secret);
   const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const claims = buildClaims(principal, ttlSeconds, issuedAt);
+  const claims = buildClaims(principal, ttlSeconds, issuedAt, binding);
   const signingInput = `${header}.${b64url(JSON.stringify(claims))}`;
   return `${signingInput}.${b64url(hmac(secret, signingInput))}`;
 }
@@ -128,6 +162,7 @@ export function verifyIdentityToken(
   secret: string,
   token: string,
   now = nowSeconds(),
+  expect?: ClaimBinding,
 ): TokenVerdict {
   assertSecret(secret);
   const parts = splitToken(token);
@@ -140,7 +175,7 @@ export function verifyIdentityToken(
     return { ok: false, reason: 'bad_signature' };
   }
 
-  return parseVerifiedClaims(payload, now);
+  return parseVerifiedClaims(payload, now, expect);
 }
 
 /**
@@ -154,6 +189,7 @@ export function mintIdentityTokenEs256(
   principal: Principal,
   ttlSeconds: number,
   issuedAt = nowSeconds(),
+  binding?: ClaimBinding,
 ): string {
   if (kid === '') throw new Error('kid must be non-empty');
   const key = createPrivateKey(privateKeyPem);
@@ -161,7 +197,7 @@ export function mintIdentityTokenEs256(
     throw new Error('ES256 signing requires an EC (P-256) private key');
   }
   const header = b64url(JSON.stringify({ alg: 'ES256', typ: 'JWT', kid }));
-  const claims = buildClaims(principal, ttlSeconds, issuedAt);
+  const claims = buildClaims(principal, ttlSeconds, issuedAt, binding);
   const signingInput = `${header}.${b64url(JSON.stringify(claims))}`;
   const signature = cryptoSign('sha256', Buffer.from(signingInput), {
     key,
@@ -180,6 +216,7 @@ export function verifyIdentityTokenJwks(
   jwks: IdentityJwks,
   token: string,
   now = nowSeconds(),
+  expect?: ClaimBinding,
 ): TokenVerdict {
   const parts = splitToken(token);
   if (parts === null) return { ok: false, reason: 'malformed' };
@@ -210,5 +247,5 @@ export function verifyIdentityTokenJwks(
   }
   if (!valid) return { ok: false, reason: 'bad_signature' };
 
-  return parseVerifiedClaims(payload, now);
+  return parseVerifiedClaims(payload, now, expect);
 }

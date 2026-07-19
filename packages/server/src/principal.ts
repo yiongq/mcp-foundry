@@ -13,6 +13,7 @@
 import type { IncomingHttpHeaders } from 'node:http';
 import type { Principal } from '@yiong/foundry-core';
 import type { IdentityJwks } from './jwks.js';
+import type { ClaimBinding } from './token.js';
 import { verifyIdentityToken, verifyIdentityTokenJwks } from './token.js';
 
 export const USER_HEADER = 'x-foundry-user';
@@ -22,8 +23,13 @@ export const ROLES_HEADER = 'x-foundry-roles';
 
 export type AuthConfig =
   | { mode: 'headers' }
-  | { mode: 'token'; secret: string }
-  | { mode: 'token-jwks'; jwks: IdentityJwks | (() => IdentityJwks) };
+  | { mode: 'token'; secret: string; expectedAud?: string; expectedIss?: string }
+  | {
+      mode: 'token-jwks';
+      jwks: IdentityJwks | (() => IdentityJwks);
+      expectedAud?: string;
+      expectedIss?: string;
+    };
 
 export type PrincipalVerdict = { ok: true; principal: Principal } | { ok: false; message: string };
 
@@ -81,12 +87,15 @@ export function resolvePrincipal(
     return { ok: false, message: 'missing Authorization: Bearer <token> header' };
   }
 
+  // 可选受众/签发方绑定：网关声明期望时才校验（多签发方共用一套 JWKS 时的防串用）。
+  // 未声明 = 空对象 = 不校验，与旧行为一致。now 为 undefined 时交给验签函数的默认取当前秒。
+  const expect: ClaimBinding = {
+    ...(auth.expectedAud !== undefined ? { aud: auth.expectedAud } : {}),
+    ...(auth.expectedIss !== undefined ? { iss: auth.expectedIss } : {}),
+  };
   let verdict: ReturnType<typeof verifyIdentityToken>;
   if (auth.mode === 'token') {
-    verdict =
-      now === undefined
-        ? verifyIdentityToken(auth.secret, token)
-        : verifyIdentityToken(auth.secret, token, now);
+    verdict = verifyIdentityToken(auth.secret, token, now, expect);
   } else {
     // 加载器抛错（如文件被移走且无缓存）按验签失败处理——宁可 401，不放行
     let jwks: IdentityJwks;
@@ -95,10 +104,7 @@ export function resolvePrincipal(
     } catch {
       return { ok: false, message: 'invalid identity token' };
     }
-    verdict =
-      now === undefined
-        ? verifyIdentityTokenJwks(jwks, token)
-        : verifyIdentityTokenJwks(jwks, token, now);
+    verdict = verifyIdentityTokenJwks(jwks, token, now, expect);
   }
   if (!verdict.ok) {
     return {

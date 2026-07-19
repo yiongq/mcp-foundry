@@ -11,7 +11,7 @@ export type { GuardedSystem, ToolEntry } from './registry.js';
 export { allowedToolEntries, assertUniqueToolNames, toRawShape } from './registry.js';
 export type { FoundryServerOptions, SystemBinding } from './server.js';
 export { createFoundryServer } from './server.js';
-export type { IdentityClaims, TokenVerdict } from './token.js';
+export type { ClaimBinding, IdentityClaims, TokenVerdict } from './token.js';
 export {
   mintIdentityToken,
   mintIdentityTokenEs256,

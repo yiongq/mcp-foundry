@@ -101,3 +101,43 @@ describe('mintIdentityToken / verifyIdentityToken', () => {
     expect(() => verifyIdentityToken('short', 'a.b.c')).toThrow();
   });
 });
+
+describe('nbf 生效时间与 aud/iss 绑定', () => {
+  const WHO = { userId: 'e004', role: 'hr_admin' } as const;
+
+  it('nbf 未来生效超出时钟偏移容忍即拒；容忍窗口内放行', () => {
+    const token = mintIdentityToken(SECRET, WHO, 3600, NOW); // nbf = NOW
+    // 早于 nbf 100s（超 30s 容忍）→ 尚未生效
+    expect(verifyIdentityToken(SECRET, token, NOW - 100)).toEqual({
+      ok: false,
+      reason: 'bad_claims',
+    });
+    // 早 20s（30s 容忍内，容时钟偏移）→ 放行
+    expect(verifyIdentityToken(SECRET, token, NOW - 20).ok).toBe(true);
+  });
+
+  it('aud 绑定：期望匹配放行；不符/缺失即拒；网关未声明期望则不校验（向后兼容）', () => {
+    const bound = mintIdentityToken(SECRET, WHO, 3600, NOW, { aud: 'mcp-foundry' });
+    expect(verifyIdentityToken(SECRET, bound, NOW + 10, { aud: 'mcp-foundry' }).ok).toBe(true);
+    expect(verifyIdentityToken(SECRET, bound, NOW + 10, { aud: 'other-svc' })).toEqual({
+      ok: false,
+      reason: 'bad_claims',
+    });
+    const unbound = mintIdentityToken(SECRET, WHO, 3600, NOW);
+    expect(verifyIdentityToken(SECRET, unbound, NOW + 10, { aud: 'mcp-foundry' })).toEqual({
+      ok: false,
+      reason: 'bad_claims',
+    });
+    expect(verifyIdentityToken(SECRET, bound, NOW + 10).ok).toBe(true); // 未声明期望 → 不校验
+  });
+
+  it('iss 绑定：只认受信签发方', () => {
+    const bound = mintIdentityToken(SECRET, WHO, 3600, NOW, { iss: 'https://idp.example.com' });
+    expect(
+      verifyIdentityToken(SECRET, bound, NOW + 10, { iss: 'https://idp.example.com' }).ok,
+    ).toBe(true);
+    expect(
+      verifyIdentityToken(SECRET, bound, NOW + 10, { iss: 'https://evil.example.com' }),
+    ).toEqual({ ok: false, reason: 'bad_claims' });
+  });
+});

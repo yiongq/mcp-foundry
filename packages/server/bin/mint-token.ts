@@ -19,6 +19,8 @@ const { values } = parseArgs({
     ttl: { type: 'string', default: '3600' },
     key: { type: 'string' },
     kid: { type: 'string' },
+    aud: { type: 'string' },
+    iss: { type: 'string' },
   },
   allowPositionals: true, // pnpm 可能把 "--" 原样传进来，别让它崩
 });
@@ -37,6 +39,11 @@ const usage = (): never => {
 const ttl = Number(values.ttl);
 if (!values.user || !values.role || !Number.isFinite(ttl) || ttl <= 0) usage();
 const principal = { userId: values.user as string, role: values.role as string };
+// 可选受众/签发方绑定：多签发方场景下把令牌钉给本网关（--aud）与受信签发方（--iss）
+const binding = {
+  ...(values.aud !== undefined ? { aud: values.aud } : {}),
+  ...(values.iss !== undefined ? { iss: values.iss } : {}),
+};
 
 let token: string;
 try {
@@ -47,11 +54,13 @@ try {
       values.kid as string,
       principal,
       ttl,
+      undefined,
+      binding,
     );
   } else {
     const secret = process.env.FOUNDRY_IDENTITY_SECRET;
     if (!secret) usage();
-    token = mintIdentityToken(secret as string, principal, ttl);
+    token = mintIdentityToken(secret as string, principal, ttl, undefined, binding);
   }
 } catch (err) {
   // 密钥文件缺失/非 EC 键/密钥太短——给一句人话，不甩裸栈

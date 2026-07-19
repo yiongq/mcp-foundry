@@ -50,6 +50,12 @@ function secondsFromEnv(name: string, fallback: number | undefined, min: number)
 
 const jwksSource = process.env.FOUNDRY_IDENTITY_JWKS;
 const secret = process.env.FOUNDRY_IDENTITY_SECRET;
+// 可选受众/签发方绑定：设了 FOUNDRY_IDENTITY_AUD / _ISS 即让网关只认「发给自己、来自受信
+// 签发方」的令牌——多签发方共用一套 JWKS 时，防止别的服务的令牌凭 role 声明在此被接受。
+const identityBinding = {
+  ...(process.env.FOUNDRY_IDENTITY_AUD ? { expectedAud: process.env.FOUNDRY_IDENTITY_AUD } : {}),
+  ...(process.env.FOUNDRY_IDENTITY_ISS ? { expectedIss: process.env.FOUNDRY_IDENTITY_ISS } : {}),
+};
 let auth: AuthConfig;
 let identityBanner: string;
 if (jwksSource) {
@@ -67,7 +73,7 @@ if (jwksSource) {
       refreshMs: refreshSeconds * 1000,
       maxStaleMs: maxStaleSeconds === undefined ? undefined : maxStaleSeconds * 1000,
     });
-    auth = { mode: 'token-jwks', jwks: loader.load };
+    auth = { mode: 'token-jwks', jwks: loader.load, ...identityBinding };
     identityBanner =
       `identity: signed token via JWKS URL (${jwksSource}, ES256/RS256, 每 ${refreshSeconds}s 刷新，忽略 Cache-Control${maxStaleSeconds === undefined ? '' : `，超 ${maxStaleSeconds}s 未刷新即 fail-closed`})\n` +
       `identity: 轮换纪律——新 kid 先发布到 JWKS 端点、等 ≥2 个刷新间隔（容一次失败轮询）再用它签发；吊销最迟一个刷新间隔生效`;
@@ -79,7 +85,7 @@ if (jwksSource) {
   } else {
     const loadJwks = createJwksFileLoader(jwksSource);
     loadJwks(); // 配置错误（文件缺失/格式坏/kid 重复）拒绝启动，不带病上线
-    auth = { mode: 'token-jwks', jwks: loadJwks };
+    auth = { mode: 'token-jwks', jwks: loadJwks, ...identityBinding };
     identityBanner = `identity: signed token via JWKS (${jwksSource}, ES256/RS256, mtime 热重载; mint via \`pnpm mint-token --key … --kid …\`)`;
   }
   if (secret) {
@@ -88,7 +94,7 @@ if (jwksSource) {
     );
   }
 } else if (secret) {
-  auth = { mode: 'token', secret };
+  auth = { mode: 'token', secret, ...identityBinding };
   identityBanner = 'identity: signed token (Authorization: Bearer …, mint via `pnpm mint-token`)';
 } else if (process.env.FOUNDRY_DEMO === '1' || process.env.FOUNDRY_DEMO === 'true') {
   // 未签名的 demo 头模式必须**显式**开启（FOUNDRY_DEMO=1），不再是「忘了配签名身份」时的
