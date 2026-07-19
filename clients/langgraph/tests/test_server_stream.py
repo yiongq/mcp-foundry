@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from app.server import Runtime, _chat_events
+from app.server import IdentityRuntime, _chat_events
 
 
 class _Chunk:
@@ -34,9 +34,8 @@ class FakeAgent:
 
 
 async def _collect(events):
-    rt = Runtime(config=None, agent=FakeAgent(events), approvals=None, tools={})
     out = []
-    async for frame in _chat_events(rt, "hi", "t1"):
+    async for frame in _chat_events(FakeAgent(events), "hi", "t1"):
         out.append(json.loads(frame["data"]))
     return out
 
@@ -121,13 +120,13 @@ class _FakeTool:
 
 @pytest.mark.asyncio
 async def test_execute_approved_reissues_stored_call():
-    from app.server import Runtime, _execute_approved
+    from app.server import _execute_approved
 
     tool = _FakeTool(_block('{"kind":"ok","data":{"contact_id":"c005"},"maskedFields":["phone"]}'))
-    rt = Runtime(config=None, agent=None, approvals=None, tools={"update_contact": tool})
+    idr = IdentityRuntime(meta=None, agent=None, tools={"update_contact": tool})
     record = {"tool": "update_contact", "args": {"contact_id": "c005", "title": "x"}}
 
-    result = await _execute_approved(rt, record)
+    result = await _execute_approved(idr, record)
     assert result["kind"] == "ok"
     # 用单据里存的原 args 重发（不经 LLM）——保证 argsHash 一致、命中已批准单
     assert tool._seen == {"contact_id": "c005", "title": "x"}
@@ -135,8 +134,8 @@ async def test_execute_approved_reissues_stored_call():
 
 @pytest.mark.asyncio
 async def test_execute_approved_missing_tool_returns_error():
-    from app.server import Runtime, _execute_approved
+    from app.server import _execute_approved
 
-    rt = Runtime(config=None, agent=None, approvals=None, tools={})
-    result = await _execute_approved(rt, {"tool": "gone", "args": {}})
+    idr = IdentityRuntime(meta=None, agent=None, tools={})
+    result = await _execute_approved(idr, {"tool": "gone", "args": {}})
     assert result["kind"] == "error"
