@@ -10,8 +10,12 @@ name: mcp-foundry
 
 services:
   foundry-server:
+    # image 指向 CI 构建并推到 GHCR 的镜像；build 保留作本地/离线兜底。
+    #   deploy-by-digest（推荐）：docker compose pull && up -d —— 跑 CI 验过的那版（部署物 = 测试物）
+    #   钉版本 / 回滚：FOUNDRY_IMAGE_TAG=<git sha> docker compose up -d（缺省 latest = 最新 main）
+    #   仍想本机现建：docker compose up --build -d
     build: .
-    image: mcp-foundry-server
+    image: ghcr.io/yiongq/mcp-foundry-server:${FOUNDRY_IMAGE_TAG:-latest}
     environment:
       PORT: "3100"
       # 生产铁律：必须设签名身份。缺失时 serve 直接拒绝启动（fail-closed，不再落回头模式）；

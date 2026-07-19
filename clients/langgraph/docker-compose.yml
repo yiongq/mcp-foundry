@@ -5,8 +5,10 @@
 name: foundry-langgraph
 services:
   langgraph-client:
+    # 同网关：image 指向 GHCR（CI 构建），build 作本地兜底。
+    # deploy-by-digest：docker compose pull && up -d；钉版本：FOUNDRY_IMAGE_TAG=<sha>。
     build: .
-    image: foundry-langgraph-client
+    image: ghcr.io/yiongq/foundry-langgraph-client:${FOUNDRY_IMAGE_TAG:-latest}
     network_mode: host
     env_file: .env
     restart: unless-stopped
