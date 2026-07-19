@@ -72,7 +72,29 @@ function cardBody(record: ApprovalRecord): Array<Record<string, unknown>> {
   ];
 }
 
-/** 待批卡：橙头 + 同意/拒绝按钮，按钮 value 携带单号与决定 */
+/** 飞书 note 块（底部灰色小字，飞书 schema 内能做的「审计脚注」形态）。 */
+function noteEl(content: string): Record<string, unknown> {
+  return { tag: 'note', elements: [{ tag: 'lark_md', content }] };
+}
+
+/** 命中规则强调行——把「为什么被挂起」摆到卡片正文里，而不是只有个橙头。 */
+function ruleLine(record: ApprovalRecord): Record<string, unknown> {
+  return {
+    tag: 'div',
+    text: {
+      tag: 'lark_md',
+      content: `⚠️ **高危写** · 命中规则 \`${record.tool} · high-risk write\``,
+    },
+  };
+}
+
+const WHY_TEXT =
+  '写操作在 `adapter.execute` 之前挂起成审批单——挂起分支无 `data` 字段，不夹带业务数据。' +
+  '批准后同参重试消票执行（一单一次、防重放）。';
+
+/** 待批卡：橙头 + 命中规则 + why 说明 + 同意/拒绝按钮 + 审计脚注。
+ * 飞书交互卡片是受限的 card JSON schema（表头只能选整块 template 色，无自定义边框/胶囊/
+ * 主题），这里在 schema 内还原设计稿的信息架构：字段网格 · 参数块 · 命中规则 · why · 审计脚注。 */
 export function buildApprovalCard(record: ApprovalRecord): Record<string, unknown> {
   return {
     config: { wide_screen_mode: true },
@@ -82,12 +104,15 @@ export function buildApprovalCard(record: ApprovalRecord): Record<string, unknow
     },
     elements: [
       ...cardBody(record),
+      ruleLine(record),
+      noteEl(WHY_TEXT),
+      { tag: 'hr' },
       {
         tag: 'action',
         actions: [
           {
             tag: 'button',
-            text: { tag: 'plain_text', content: '同意' },
+            text: { tag: 'plain_text', content: '同意并执行' },
             type: 'primary',
             value: { approvalId: record.id, decision: 'approve' },
           },
@@ -99,11 +124,13 @@ export function buildApprovalCard(record: ApprovalRecord): Record<string, unknow
           },
         ],
       },
+      noteEl('🔒 审批人须为本域独立 approver · 发起人不能自批'),
+      noteEl('pending · 无 data · 闸门在写入之前 · 全程审计'),
     ],
   };
 }
 
-/** 已决卡：翻面后不再有按钮，头色随结果 */
+/** 已决卡：翻面后不再有按钮，头色随结果；底部脚注说明消票/不执行的最终态。 */
 export function buildDecidedCard(
   record: ApprovalRecord,
   outcome: 'approved' | 'denied' | 'expired',
@@ -114,10 +141,20 @@ export function buildDecidedCard(
     denied: { template: 'red', title: `❌ 审批单 #${shortId(record.id)} 已拒绝` },
     expired: { template: 'grey', title: `⏰ 审批单 #${shortId(record.id)} 已过期` },
   }[outcome];
+  const footer = {
+    approved: 'consumed · 单号一次性核销 · 重复提交不再触发第二次写入 · 全程审计',
+    denied: 'denied · 操作不会执行 · 全程审计',
+    expired: 'expired · 单据已失效 · 全程审计',
+  }[outcome];
   return {
     config: { wide_screen_mode: true },
     header: { template: header.template, title: { tag: 'plain_text', content: header.title } },
-    elements: [...cardBody(record), { tag: 'div', text: { tag: 'lark_md', content: detail } }],
+    elements: [
+      ...cardBody(record),
+      { tag: 'div', text: { tag: 'lark_md', content: detail } },
+      { tag: 'hr' },
+      noteEl(footer),
+    ],
   };
 }
 
