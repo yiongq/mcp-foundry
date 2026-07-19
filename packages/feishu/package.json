@@ -19,7 +19,7 @@
     "@yiong/foundry-adapter-twenty": "workspace:*",
     "@yiong/foundry-core": "workspace:*",
     "yaml": "^2.7.0",
-    "zod": "^3.24.0",
+    "zod": "^4.4.3",
     "zod-to-json-schema": "^3.24.0"
   },
   "devDependencies": {
