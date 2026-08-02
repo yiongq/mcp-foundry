@@ -16,9 +16,9 @@
     "seed:twenty": "node --import tsx packages/adapter-twenty/bin/seed-twenty.ts"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.0.0",
-    "@vitest/coverage-v8": "^3.2.7",
-    "typescript": "^5.8.0",
-    "vitest": "^3.2.0"
+    "@biomejs/biome": "^2.5.6",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
