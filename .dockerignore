@@ -8,4 +8,5 @@ docker
 .env
 .env.*
 !.env.production.example
+config/identity.feishu.yaml
 *.log
