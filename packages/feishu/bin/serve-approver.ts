@@ -75,7 +75,14 @@ const seen = new Map<string, ApprovalRecord>();
 const channel = createLarkChannel({
   appId,
   appSecret,
-  loggerLevel: LoggerLevel.warn,
+  // 排障时 FEISHU_LOG_LEVEL=debug 可看到 SDK 内部「safety: drop duplicate/in-flight action」
+  // 这类静默丢弃——它们不走 error 事件,不开 debug 就查不到。
+  loggerLevel:
+    process.env.FEISHU_LOG_LEVEL === 'debug'
+      ? LoggerLevel.debug
+      : process.env.FEISHU_LOG_LEVEL === 'info'
+        ? LoggerLevel.info
+        : LoggerLevel.warn,
   policy: { requireMention: true, dmMode: 'open' },
 });
 
@@ -88,7 +95,20 @@ const cards = {
   },
 };
 
+// WS 生命周期：卡片「发」走 HTTP、「点」走 WS 长连接——WS 悄悄断掉时发卡照常、点按却全无
+// 反应,且此前一个 handler 都没注册,故障完全静音。这几条日志是排障的唯一抓手。
+channel.on('error', (err: Error) => {
+  console.error('[approver] 通道错误:', err.message);
+});
+channel.on('reconnecting', () => {
+  console.warn('[approver] WS 重连中……(此间卡片点按不会到达)');
+});
+channel.on('reconnected', () => {
+  console.log('[approver] WS 已重连');
+});
+
 channel.on('cardAction', (evt: { messageId: string; action: { value: unknown } }) => {
+  console.log(`[approver] 收到卡片点按 message=${evt.messageId} value=${JSON.stringify(evt.action.value)}`);
   void relayCardDecision(
     { messageId: evt.messageId, action: { value: evt.action.value } },
     gateway,
@@ -105,10 +125,25 @@ const poll = (): void => {
   });
 };
 
+// WS 健康度：只在状态变化时打一行,免得刷屏。发卡走 HTTP 不受影响,所以
+// 「卡片能收到但点了没反应」时,这里是唯一能看出 WS 已死的地方。
+let lastWsState: string | undefined;
+const reportWs = (): void => {
+  const state = channel.getConnectionStatus()?.state ?? '(无 WSClient)';
+  if (state !== lastWsState) {
+    console.log(`[approver] WS 状态：${lastWsState ?? '—'} → ${state}`);
+    lastWsState = state;
+  }
+};
+
 await channel.connect();
 const identity = channel.botIdentity;
 console.log(
   `[approver] 已连接：${identity ? identity.name : '(未知)'}；审批人=${who}；网关=${gatewayUrl}；每 ${pollMs}ms 轮询待审批单`,
 );
+reportWs();
 poll();
-setInterval(poll, pollMs);
+setInterval(() => {
+  reportWs();
+  poll();
+}, pollMs);
