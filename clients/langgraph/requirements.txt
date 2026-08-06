@@ -1,7 +1,7 @@
 # 全部精确钉版（== 而非 >=）：2026-08-02 起 CI 因 pip 解析到最新
 # langchain-mcp-adapters 与 mcp 版本脱节而挂（cannot import RequestContext），
 # 这套组合是本地 .venv 实测可跑的版本。升级请整组升并本地跑过 pytest 再提。
-langgraph==1.2.9
+langgraph==1.2.10
 langchain-mcp-adapters==0.3.0
 langchain-core==1.4.9
 langchain-openai==1.3.5
