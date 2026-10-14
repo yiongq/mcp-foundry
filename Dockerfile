@@ -4,7 +4,7 @@
 # 硬化要点：基础镜像按摘要固定（可复现构建，Dependabot 负责升级）；tini 当 PID1 转发信号、
 # 收割僵尸；容器以非 root 运行（逃逸不落到宿主 root）；HEALTHCHECK 探 /healthz；
 # node 直接 exec（不经 pnpm）于是 SIGTERM 直达进程 → serve.ts 优雅关闭。
-FROM node:22-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3
+FROM node:25-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370
 
 # tini：正确的 PID1，转发 SIGTERM 给 node（触发 serve.ts 优雅关闭）、收割任何孤儿进程
 RUN apt-get update \
