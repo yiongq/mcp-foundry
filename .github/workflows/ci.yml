@@ -83,7 +83,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build (+push on main) foundry-server
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: ${{ github.event_name == 'push' }}
@@ -93,7 +93,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Build (+push on main) langgraph-client
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: clients/langgraph
           push: ${{ github.event_name == 'push' }}
