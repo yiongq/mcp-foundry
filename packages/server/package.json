@@ -16,7 +16,7 @@
     "verify-audit": "node --import tsx bin/verify-audit.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.20.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@yiong/foundry-adapter-orangehrm": "workspace:*",
     "@yiong/foundry-adapter-twenty": "workspace:*",
     "@yiong/foundry-core": "workspace:*",
